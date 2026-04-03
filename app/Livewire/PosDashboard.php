@@ -2,196 +2,282 @@
 
 namespace App\Livewire;
 
+use App\Models\Branch;
+use App\Models\Category;
+use App\Models\DiningTable;
+use App\Models\Order;
+use App\Models\Product;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class PosDashboard extends Component
 {
     public string $search = '';
 
-    public string $category = 'all';
+    public string $categoryId = 'all';
 
-    public bool $rushMode = true;
+    public string $orderType = 'dine_in';
 
-    public int $servedToday = 128;
+    public ?int $branchId = null;
 
-    public int $ticketsOpen = 14;
+    public ?int $tableId = null;
 
-    public int $activeSlide = 0;
+    public string $customerName = '';
 
-    public array $menuItems = [
-        [
-            'id' => 1,
-            'name' => 'Charcoal Burger',
-            'category' => 'grill',
-            'price' => 42000,
-            'tag' => 'Top seller',
-            'description' => 'Smoked beef, cheddar, house sauce.',
-        ],
-        [
-            'id' => 2,
-            'name' => 'Lagman Bowl',
-            'category' => 'kitchen',
-            'price' => 38000,
-            'tag' => 'Fresh',
-            'description' => 'Hand-pulled noodles with rich broth.',
-        ],
-        [
-            'id' => 3,
-            'name' => 'Cafe Latte',
-            'category' => 'bar',
-            'price' => 19000,
-            'tag' => 'Smooth',
-            'description' => 'Double shot espresso with steamed milk.',
-        ],
-        [
-            'id' => 4,
-            'name' => 'Caesar Salad',
-            'category' => 'cold',
-            'price' => 26000,
-            'tag' => 'Light',
-            'description' => 'Crisp greens, parmesan, classic dressing.',
-        ],
-        [
-            'id' => 5,
-            'name' => 'Shashlik Combo',
-            'category' => 'grill',
-            'price' => 51000,
-            'tag' => 'Weekend',
-            'description' => 'Three skewers with onion salad.',
-        ],
-        [
-            'id' => 6,
-            'name' => 'Berry Cheesecake',
-            'category' => 'dessert',
-            'price' => 24000,
-            'tag' => 'Sweet',
-            'description' => 'Creamy cake with berry glaze.',
-        ],
-    ];
+    public string $customerPhone = '';
 
-    public array $cart = [
-        1 => 2,
-        3 => 1,
-        5 => 1,
-    ];
+    public string $deliveryAddress = '';
 
-    public array $slides = [
-        [
-            'title' => 'Kitchen Rush',
-            'value' => '07 orders',
-            'copy' => 'Local orders are routed without any CDN dependency.',
-        ],
-        [
-            'title' => 'Cafe Flow',
-            'value' => '18 min',
-            'copy' => 'Livewire state updates keep the ticket board reactive.',
-        ],
-        [
-            'title' => 'Dessert Tray',
-            'value' => '92%',
-            'copy' => 'Swiper-ready carousel cards for featured menu items.',
-        ],
-    ];
+    public string $paymentMethod = 'cash';
 
-    public function setCategory(string $category): void
+    public string $notes = '';
+
+    /** @var array<int, int> */
+    public array $cart = [];
+
+    public function mount(): void
     {
-        $this->category = $category;
+        $this->branchId = auth()->user()->branch_id
+            ?? Branch::where('is_active', true)->value('id');
+
+        $this->tableId = $this->availableTables()->first()?->id;
     }
 
-    public function toggleRushMode(): void
+    public function setCategory(string $categoryId): void
     {
-        $this->rushMode = ! $this->rushMode;
+        $this->categoryId = $categoryId;
     }
 
-    public function addToCart(int $itemId): void
+    public function addProduct(int $productId): void
     {
-        $this->cart[$itemId] = ($this->cart[$itemId] ?? 0) + 1;
-        $this->servedToday++;
-        $this->ticketsOpen++;
+        $this->cart[$productId] = ($this->cart[$productId] ?? 0) + 1;
     }
 
-    public function removeFromCart(int $itemId): void
+    public function incrementQuantity(int $productId): void
     {
-        if (! isset($this->cart[$itemId])) {
+        $this->addProduct($productId);
+    }
+
+    public function decrementQuantity(int $productId): void
+    {
+        if (! isset($this->cart[$productId])) {
             return;
         }
 
-        $this->cart[$itemId]--;
+        $this->cart[$productId]--;
 
-        if ($this->cart[$itemId] <= 0) {
-            unset($this->cart[$itemId]);
+        if ($this->cart[$productId] <= 0) {
+            unset($this->cart[$productId]);
+        }
+    }
+
+    public function removeProduct(int $productId): void
+    {
+        unset($this->cart[$productId]);
+    }
+
+    public function updatedBranchId(): void
+    {
+        if ($this->orderType !== 'dine_in') {
+            return;
         }
 
-        $this->ticketsOpen = max(1, $this->ticketsOpen - 1);
+        $this->tableId = $this->availableTables()->first()?->id;
     }
 
-    public function nextSlide(): void
+    public function updatedOrderType(string $value): void
     {
-        $this->activeSlide = ($this->activeSlide + 1) % count($this->slides);
-    }
-
-    public function previousSlide(): void
-    {
-        $this->activeSlide = ($this->activeSlide - 1 + count($this->slides)) % count($this->slides);
-    }
-
-    public function getVisibleMenuProperty(): array
-    {
-        $search = mb_strtolower(trim($this->search));
-
-        return array_values(array_filter($this->menuItems, function (array $item) use ($search) {
-            $matchesCategory = $this->category === 'all' || $item['category'] === $this->category;
-
-            if ($search === '') {
-                return $matchesCategory;
-            }
-
-            $haystack = mb_strtolower($item['name'].' '.$item['description'].' '.$item['tag']);
-
-            return $matchesCategory && str_contains($haystack, $search);
-        }));
-    }
-
-    public function getCartItemsProperty(): array
-    {
-        $items = [];
-
-        foreach ($this->cart as $itemId => $quantity) {
-            $menuItem = collect($this->menuItems)->firstWhere('id', $itemId);
-
-            if (! $menuItem) {
-                continue;
-            }
-
-            $items[] = [
-                ...$menuItem,
-                'quantity' => $quantity,
-                'subtotal' => $quantity * $menuItem['price'],
-            ];
+        if ($value !== 'dine_in') {
+            $this->tableId = null;
+        } else {
+            $this->tableId = $this->availableTables()->first()?->id;
         }
 
-        return $items;
+        if ($value !== 'delivery') {
+            $this->deliveryAddress = '';
+        }
+
+        if ($value === 'dine_in') {
+            $this->customerName = '';
+            $this->customerPhone = '';
+        }
     }
 
-    public function getCartTotalProperty(): int
+    public function checkout()
     {
-        return collect($this->cartItems)->sum('subtotal');
+        if ($this->cartItems()->isEmpty()) {
+            $this->addError('cart', 'Kamida bitta mahsulot qo‘shing.');
+
+            return null;
+        }
+
+        $validated = $this->validate([
+            'branchId' => ['required', 'exists:branches,id'],
+            'orderType' => ['required', Rule::in(array_keys(config('pos.order_types')))],
+            'tableId' => [Rule::requiredIf($this->orderType === 'dine_in'), 'nullable', 'exists:dining_tables,id'],
+            'customerName' => [Rule::requiredIf(in_array($this->orderType, ['takeaway', 'delivery'], true)), 'nullable', 'string', 'max:255'],
+            'customerPhone' => [Rule::requiredIf(in_array($this->orderType, ['takeaway', 'delivery'], true)), 'nullable', 'string', 'max:255'],
+            'deliveryAddress' => [Rule::requiredIf($this->orderType === 'delivery'), 'nullable', 'string'],
+            'paymentMethod' => ['required', Rule::in(array_keys(config('pos.payment_methods')))],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        if ($this->orderType === 'dine_in' && ! $this->availableTables()->contains('id', $this->tableId)) {
+            $this->addError('tableId', 'Tanlangan stol ushbu filialga tegishli emas.');
+
+            return null;
+        }
+
+        $cartItems = $this->cartItems();
+        $subtotal = $cartItems->sum('line_total');
+
+        $order = DB::transaction(function () use ($validated, $cartItems, $subtotal) {
+            $order = Order::create([
+                'order_number' => $this->generateOrderNumber(),
+                'branch_id' => $validated['branchId'],
+                'dining_table_id' => $validated['tableId'],
+                'user_id' => auth()->id(),
+                'order_type' => $validated['orderType'],
+                'status' => 'paid',
+                'customer_name' => $validated['customerName'] ?: null,
+                'customer_phone' => $validated['customerPhone'] ?: null,
+                'delivery_address' => $validated['deliveryAddress'] ?: null,
+                'notes' => $validated['notes'] ?: null,
+                'subtotal' => $subtotal,
+                'total' => $subtotal,
+                'placed_at' => now(),
+                'paid_at' => now(),
+            ]);
+
+            foreach ($cartItems as $item) {
+                $order->items()->create([
+                    'product_id' => $item['id'],
+                    'product_name' => $item['name'],
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['price'],
+                    'line_total' => $item['line_total'],
+                ]);
+            }
+
+            $order->payments()->create([
+                'user_id' => auth()->id(),
+                'method' => $validated['paymentMethod'],
+                'amount' => $subtotal,
+                'paid_at' => now(),
+            ]);
+
+            return $order;
+        });
+
+        $this->resetCheckoutState();
+        session()->flash('status', 'Order muvaffaqiyatli yaratildi.');
+
+        return redirect()->route('orders.receipt', $order);
+    }
+
+    protected function availableTables(): Collection
+    {
+        if (! $this->branchId) {
+            return collect();
+        }
+
+        return DiningTable::query()
+            ->where('branch_id', $this->branchId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+    protected function cartItems(): Collection
+    {
+        $products = Product::query()
+            ->with('category')
+            ->whereIn('id', array_keys($this->cart))
+            ->get()
+            ->keyBy('id');
+
+        return collect($this->cart)
+            ->map(function (int $quantity, int|string $productId) use ($products) {
+                $product = $products->get((int) $productId);
+
+                if (! $product) {
+                    return null;
+                }
+
+                $lineTotal = $quantity * (float) $product->price;
+
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'category' => $product->category?->name,
+                    'price' => (float) $product->price,
+                    'quantity' => $quantity,
+                    'line_total' => $lineTotal,
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    protected function generateOrderNumber(): string
+    {
+        do {
+            $orderNumber = 'ORD-'.now()->format('Ymd-His').'-'.str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT);
+        } while (Order::where('order_number', $orderNumber)->exists());
+
+        return $orderNumber;
+    }
+
+    protected function resetCheckoutState(): void
+    {
+        $this->search = '';
+        $this->categoryId = 'all';
+        $this->orderType = 'dine_in';
+        $this->tableId = $this->availableTables()->first()?->id;
+        $this->customerName = '';
+        $this->customerPhone = '';
+        $this->deliveryAddress = '';
+        $this->paymentMethod = 'cash';
+        $this->notes = '';
+        $this->cart = [];
+        $this->resetErrorBag();
     }
 
     public function render()
     {
+        $search = trim($this->search);
+        $cartItems = $this->cartItems();
+
+        $products = Product::query()
+            ->with('category')
+            ->where('is_active', true)
+            ->when($this->categoryId !== 'all', fn ($query) => $query->where('category_id', (int) $this->categoryId))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($innerQuery) use ($search) {
+                    $innerQuery
+                        ->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('description', 'like', '%'.$search.'%')
+                        ->orWhere('sku', 'like', '%'.$search.'%');
+                });
+            })
+            ->orderBy('name')
+            ->get();
+
         return view('livewire.pos-dashboard', [
-            'categories' => [
-                'all' => 'All',
-                'grill' => 'Grill',
-                'kitchen' => 'Kitchen',
-                'bar' => 'Bar',
-                'cold' => 'Cold',
-                'dessert' => 'Dessert',
-            ],
-            'visibleMenu' => $this->visibleMenu,
-            'cartItems' => $this->cartItems,
-            'cartTotal' => $this->cartTotal,
+            'branches' => Branch::where('is_active', true)->orderBy('name')->get(),
+            'categories' => Category::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(),
+            'availableTables' => $this->availableTables(),
+            'products' => $products,
+            'cartItems' => $cartItems,
+            'subtotal' => $cartItems->sum('line_total'),
+            'recentOrders' => Order::query()
+                ->with(['cashier', 'branch'])
+                ->when($this->branchId, fn ($query) => $query->where('branch_id', $this->branchId))
+                ->latest('paid_at')
+                ->limit(6)
+                ->get(),
         ]);
     }
 }

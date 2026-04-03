@@ -5,8 +5,10 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 
 class User extends Authenticatable
 {
@@ -20,7 +22,9 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
-        'email',
+        'login',
+        'branch_id',
+        'role_id',
         'password',
     ];
 
@@ -42,8 +46,50 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->role?->name === $role;
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        $this->loadMissing('role.permissions');
+
+        return $this->role?->permissions->contains('name', $permission) ?? false;
+    }
+
+    public function hasAnyPermission(array $permissions): bool
+    {
+        $this->loadMissing('role.permissions');
+
+        if (! $this->role) {
+            return false;
+        }
+
+        return $this->role->permissions
+            ->pluck('name')
+            ->intersect($permissions)
+            ->isNotEmpty();
+    }
+
+    public function permissionNames(): Collection
+    {
+        $this->loadMissing('role.permissions');
+
+        return $this->role?->permissions->pluck('name')->values() ?? collect();
     }
 }
