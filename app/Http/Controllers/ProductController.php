@@ -27,6 +27,7 @@ class ProductController extends Controller
             'sku' => ['nullable', 'string', 'max:255', 'unique:products,sku'],
             'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
+            'station' => ['required', Rule::in(array_keys(config('pos.product_stations')))],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
@@ -46,6 +47,7 @@ class ProductController extends Controller
             'sku' => ['nullable', 'string', 'max:255', Rule::unique('products', 'sku')->ignore($product->id)],
             'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
+            'station' => ['required', Rule::in(array_keys(config('pos.product_stations')))],
             'is_active' => ['nullable', 'boolean'],
         ]);
 

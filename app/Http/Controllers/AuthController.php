@@ -34,9 +34,15 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        $redirectTo = $request->user()->hasPermission('reports.view')
-            ? route('dashboard')
-            : route('pos.index');
+        $user = $request->user();
+
+        $redirectTo = match (true) {
+            $user->hasPermission('reports.view') => route('dashboard'),
+            $user->hasPermission('waiter.panel') => route('waiter.index'),
+            $user->hasPermission('kitchen.view') => route('kitchen.index'),
+            $user->hasPermission('bar.view') => route('bar.index'),
+            default => route('pos.index'),
+        };
 
         return redirect()->intended($redirectTo);
     }

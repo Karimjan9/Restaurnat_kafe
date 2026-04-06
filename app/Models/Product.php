@@ -17,6 +17,7 @@ class Product extends Model
         'sku',
         'description',
         'price',
+        'station',
         'is_active',
     ];
 
@@ -26,6 +27,11 @@ class Product extends Model
             'price' => 'decimal:2',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function stationLabel(): string
+    {
+        return config("pos.product_stations.{$this->station}", $this->station);
     }
 
     public function category(): BelongsTo

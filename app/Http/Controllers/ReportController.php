@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ class ReportController extends Controller
         $branchId = $request->integer('branch_id') ?: null;
 
         $ordersQuery = Order::query()
-            ->where('status', 'paid')
+            ->whereIn('status', Order::financialStatuses())
             ->whereBetween('paid_at', [$dateFrom, $dateTo])
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId));
 
@@ -50,8 +51,24 @@ class ReportController extends Controller
             ->limit(8)
             ->get();
 
+        $waiterPerformance = User::query()
+            ->select(
+                'users.id',
+                'users.name',
+                DB::raw('COUNT(orders.id) as orders_count'),
+                DB::raw('SUM(orders.total) as revenue')
+            )
+            ->join('orders', 'orders.waiter_user_id', '=', 'users.id')
+            ->whereIn('orders.status', Order::financialStatuses())
+            ->whereBetween('orders.paid_at', [$dateFrom, $dateTo])
+            ->when($branchId, fn ($query) => $query->where('orders.branch_id', $branchId))
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('revenue')
+            ->orderBy('users.name')
+            ->get();
+
         $recentOrders = (clone $ordersQuery)
-            ->with(['branch', 'cashier'])
+            ->with(['branch', 'cashier', 'waiter'])
             ->latest('paid_at')
             ->limit(10)
             ->get();
@@ -69,6 +86,7 @@ class ReportController extends Controller
             'paymentBreakdown' => $paymentBreakdown,
             'orderTypeBreakdown' => $orderTypeBreakdown,
             'topProducts' => $topProducts,
+            'waiterPerformance' => $waiterPerformance,
             'recentOrders' => $recentOrders,
         ]);
     }

@@ -15,7 +15,7 @@ class CreateOrderTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_cashier_can_create_a_paid_dine_in_order(): void
+    public function test_cashier_can_create_and_auto_close_a_dine_in_order(): void
     {
         $this->seed(RestaurantPosSeeder::class);
 
@@ -32,9 +32,10 @@ class CreateOrderTest extends TestCase
         $order = Order::with(['items', 'payments'])->first();
 
         $this->assertNotNull($order);
-        $this->assertSame('paid', $order->status);
+        $this->assertSame('closed', $order->status);
         $this->assertSame('dine_in', $order->order_type);
         $this->assertNotNull($order->dining_table_id);
+        $this->assertNotNull($order->closed_at);
         $this->assertCount(1, $order->items);
         $this->assertCount(1, $order->payments);
     }

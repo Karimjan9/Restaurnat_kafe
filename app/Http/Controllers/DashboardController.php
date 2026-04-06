@@ -18,7 +18,8 @@ class DashboardController extends Controller
         $today = now()->toDateString();
 
         $recentOrders = Order::query()
-            ->with(['branch', 'cashier'])
+            ->with(['branch', 'cashier', 'waiter'])
+            ->whereIn('status', Order::financialStatuses())
             ->latest('paid_at')
             ->limit(6)
             ->get();

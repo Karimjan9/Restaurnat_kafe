@@ -5,18 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Payment extends Model
+class OrderSplit extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'order_id',
-        'order_split_id',
-        'user_id',
-        'method',
+        'split_number',
+        'label',
         'amount',
-        'reference',
+        'status',
+        'paid_by_user_id',
         'paid_at',
     ];
 
@@ -33,13 +34,18 @@ class Payment extends Model
         return $this->belongsTo(Order::class);
     }
 
-    public function orderSplit(): BelongsTo
+    public function paidBy(): BelongsTo
     {
-        return $this->belongsTo(OrderSplit::class);
+        return $this->belongsTo(User::class, 'paid_by_user_id');
     }
 
-    public function cashier(): BelongsTo
+    public function payments(): HasMany
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->hasMany(Payment::class, 'order_split_id');
+    }
+
+    public function statusLabel(): string
+    {
+        return config("pos.order_split_statuses.{$this->status}", $this->status);
     }
 }
