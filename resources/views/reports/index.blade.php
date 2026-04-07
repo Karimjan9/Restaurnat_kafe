@@ -7,7 +7,7 @@
                 <div>
                     <p class="text-xs uppercase tracking-[0.35em] text-amber-200">Basic report</p>
                     <h2 class="mt-2 text-3xl font-semibold text-white">Sales snapshot</h2>
-                    <p class="mt-2 text-sm text-slate-300">Branch va sana oralig'i bo'yicha savdo, payment va top mahsulotlarni ko'rsatadi.</p>
+                    <p class="mt-2 text-sm text-slate-300">Branch va sana oralig'i bo'yicha savdo, payment, top mahsulot va ofitsiant tushumini ko'rsatadi.</p>
                 </div>
 
                 <form method="GET" action="{{ route('reports.index') }}" class="grid gap-3 md:grid-cols-4">
@@ -41,7 +41,7 @@
                 <p class="mt-3 text-3xl font-semibold text-white">{{ number_format((float) $grossSales) }} so'm</p>
             </div>
             <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Paid orders</p>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Completed orders</p>
                 <p class="mt-3 text-3xl font-semibold text-white">{{ $orderCount }}</p>
             </div>
             <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
@@ -100,8 +100,40 @@
         </section>
 
         <section class="soft-panel rounded-[2rem] border border-white/10 p-6">
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Service team</p>
+            <h3 class="mt-2 text-xl font-semibold text-white">Waiter performance</h3>
+
+            <div class="mt-5 overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr class="text-slate-400">
+                            <th>Waiter</th>
+                            <th>Orders</th>
+                            <th>Revenue</th>
+                            <th>Average</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($waiterPerformance as $waiter)
+                            <tr>
+                                <td>{{ $waiter->name }}</td>
+                                <td>{{ $waiter->orders_count }}</td>
+                                <td>{{ number_format((float) $waiter->revenue) }} so'm</td>
+                                <td>{{ number_format((float) $waiter->revenue / max(1, $waiter->orders_count)) }} so'm</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4" class="text-slate-400">Bu oraliqda waiter orderlari hali yo'q.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="soft-panel rounded-[2rem] border border-white/10 p-6">
             <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Receipts</p>
-            <h3 class="mt-2 text-xl font-semibold text-white">Recent paid orders</h3>
+            <h3 class="mt-2 text-xl font-semibold text-white">Recent completed orders</h3>
 
             <div class="mt-5 overflow-x-auto">
                 <table class="table">
@@ -110,6 +142,7 @@
                             <th>Order</th>
                             <th>Branch</th>
                             <th>Type</th>
+                            <th>Waiter</th>
                             <th>Cashier</th>
                             <th>Total</th>
                             <th></th>
@@ -121,7 +154,8 @@
                                 <td>{{ $order->order_number }}</td>
                                 <td>{{ $order->branch?->name }}</td>
                                 <td>{{ config('pos.order_types')[$order->order_type] ?? $order->order_type }}</td>
-                                <td>{{ $order->cashier?->name }}</td>
+                                <td>{{ $order->waiter?->name ?? 'N/A' }}</td>
+                                <td>{{ $order->cashier?->name ?? 'N/A' }}</td>
                                 <td>{{ number_format((float) $order->total) }} so'm</td>
                                 <td>
                                     <a href="{{ route('orders.receipt', $order) }}" class="btn btn-xs btn-outline btn-warning">Receipt</a>
@@ -129,7 +163,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-slate-400">Bu oraliqda order yo'q.</td>
+                                <td colspan="7" class="text-slate-400">Bu oraliqda order yo'q.</td>
                             </tr>
                         @endforelse
                     </tbody>

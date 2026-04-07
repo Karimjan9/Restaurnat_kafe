@@ -67,7 +67,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Recent activity</p>
-                        <h3 class="mt-2 text-xl font-semibold text-white">Latest paid orders</h3>
+                        <h3 class="mt-2 text-xl font-semibold text-white">Latest completed orders</h3>
                     </div>
                     @can('orders.create')
                         <a href="{{ route('pos.index') }}" class="btn btn-sm btn-warning">New order</a>
@@ -81,6 +81,7 @@
                                 <th>Order</th>
                                 <th>Branch</th>
                                 <th>Type</th>
+                                <th>Waiter</th>
                                 <th>Cashier</th>
                                 <th>Total</th>
                             </tr>
@@ -95,12 +96,13 @@
                                     </td>
                                     <td>{{ $order->branch?->name }}</td>
                                     <td>{{ config('pos.order_types')[$order->order_type] ?? $order->order_type }}</td>
-                                    <td>{{ $order->cashier?->name }}</td>
+                                    <td>{{ $order->waiter?->name ?? 'N/A' }}</td>
+                                    <td>{{ $order->cashier?->name ?? 'N/A' }}</td>
                                     <td>{{ number_format((float) $order->total) }} so'm</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-slate-400">Hali order yo'q.</td>
+                                    <td colspan="6" class="text-slate-400">Hali order yo'q.</td>
                                 </tr>
                             @endforelse
                         </tbody>

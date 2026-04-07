@@ -17,9 +17,25 @@ Route::get('/', function () {
         return redirect()->route('login');
     }
 
-    return redirect()->route(
-        auth()->user()->hasPermission('reports.view') ? 'dashboard' : 'pos.index'
-    );
+    $user = auth()->user();
+
+    if ($user->hasPermission('reports.view')) {
+        return redirect()->route('dashboard');
+    }
+
+    if ($user->hasPermission('waiter.panel')) {
+        return redirect()->route('waiter.index');
+    }
+
+    if ($user->hasPermission('kitchen.view')) {
+        return redirect()->route('kitchen.index');
+    }
+
+    if ($user->hasPermission('bar.view')) {
+        return redirect()->route('bar.index');
+    }
+
+    return redirect()->route('pos.index');
 })->name('home');
 
 Route::middleware('guest')->group(function () {
@@ -35,6 +51,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)
         ->middleware('can:dashboard.view')
         ->name('dashboard');
+
+    Route::view('/waiter', 'waiter.index')
+        ->middleware('can:waiter.panel')
+        ->name('waiter.index');
+
+    Route::view('/kitchen', 'stations.kitchen')
+        ->middleware('can:kitchen.view')
+        ->name('kitchen.index');
+
+    Route::view('/bar', 'stations.bar')
+        ->middleware('can:bar.view')
+        ->name('bar.index');
 
     Route::view('/pos', 'pos.index')
         ->middleware('can:orders.create')

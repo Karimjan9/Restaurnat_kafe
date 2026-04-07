@@ -14,9 +14,15 @@ class OrderItem extends Model
         'order_id',
         'product_id',
         'product_name',
+        'station',
         'quantity',
         'unit_price',
         'line_total',
+        'preparation_status',
+        'sent_to_station_at',
+        'started_preparing_at',
+        'ready_at',
+        'served_at',
     ];
 
     protected function casts(): array
@@ -24,7 +30,16 @@ class OrderItem extends Model
         return [
             'unit_price' => 'decimal:2',
             'line_total' => 'decimal:2',
+            'sent_to_station_at' => 'datetime',
+            'started_preparing_at' => 'datetime',
+            'ready_at' => 'datetime',
+            'served_at' => 'datetime',
         ];
+    }
+
+    public function preparationStatusLabel(): string
+    {
+        return config("pos.preparation_statuses.{$this->preparation_status}", $this->preparation_status);
     }
 
     public function order(): BelongsTo

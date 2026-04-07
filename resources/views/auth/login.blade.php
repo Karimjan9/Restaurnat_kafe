@@ -1,9 +1,47 @@
 @extends('layouts.auth')
 
 @section('content')
+    <div class="grid w-full gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <section class="soft-panel rounded-[2rem] border border-white/10 p-8">
+            <p class="text-xs uppercase tracking-[0.35em] text-amber-200">Restaurant POS MVP</p>
+            <h1 class="mt-4 max-w-xl text-4xl font-semibold text-white">Login, branch flow va checkout bilan ishlaydigan birinchi versiya</h1>
+            <p class="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+                Tizimda admin, manager, cashier, waiter, chef va bartender rollari tayyor. Front-of-house, kitchen, bar, payment va basic report oqimi bitta loyihada jamlangan.
+            </p>
 
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+            <div class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Admin</p>
+                    <p class="mt-2 text-sm text-white">admin</p>
+                    <p class="text-sm text-slate-400">admin456</p>
+                </div>
+                <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Manager</p>
+                    <p class="mt-2 text-sm text-white">manager</p>
+                    <p class="text-sm text-slate-400">manager456</p>
+                </div>
+                <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Cashier</p>
+                    <p class="mt-2 text-sm text-white">cashier</p>
+                    <p class="text-sm text-slate-400">cashier456</p>
+                </div>
+                <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Waiter</p>
+                    <p class="mt-2 text-sm text-white">waiter</p>
+                    <p class="text-sm text-slate-400">waiter456</p>
+                </div>
+                <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Chef</p>
+                    <p class="mt-2 text-sm text-white">chef</p>
+                    <p class="text-sm text-slate-400">chef456</p>
+                </div>
+                <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Bartender</p>
+                    <p class="mt-2 text-sm text-white">bartender</p>
+                    <p class="text-sm text-slate-400">bartender456</p>
+                </div>
+            </div>
+        </section>
 
 body, html {
     margin: 0;

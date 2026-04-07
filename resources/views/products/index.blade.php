@@ -32,6 +32,15 @@
                     </div>
 
                     <label class="form-control">
+                        <span class="label-text mb-2 text-slate-300">Preparation station</span>
+                        <select name="station" class="select select-bordered bg-slate-950/70 text-white" required>
+                            @foreach (config('pos.product_stations') as $station => $label)
+                                <option value="{{ $station }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="form-control">
                         <span class="label-text mb-2 text-slate-300">Description</span>
                         <textarea name="description" rows="3" class="textarea textarea-bordered bg-slate-950/70 text-white"></textarea>
                     </label>
@@ -64,6 +73,7 @@
                                     <p class="mt-1 text-sm text-slate-400">{{ $product->description }}</p>
                                 </div>
                                 <div class="text-right">
+                                    <span class="badge {{ $product->station === 'bar' ? 'badge-info' : 'badge-warning' }}">{{ $product->stationLabel() }}</span>
                                     <p class="font-semibold text-amber-200">{{ number_format((float) $product->price) }} so'm</p>
                                     <p class="text-xs text-slate-500">{{ $product->sku ?: 'No SKU' }}</p>
                                 </div>
@@ -84,7 +94,7 @@
                         @csrf
                         @method('PUT')
 
-                        <div class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr_0.8fr_0.8fr_auto]">
+                        <div class="grid gap-4 xl:grid-cols-[0.8fr_1fr_0.8fr_0.8fr_0.8fr_auto]">
                             <label class="form-control">
                                 <span class="label-text mb-2 text-slate-300">Category</span>
                                 <select name="category_id" class="select select-bordered bg-slate-950/70 text-white" required>
@@ -102,6 +112,15 @@
                             <label class="form-control">
                                 <span class="label-text mb-2 text-slate-300">SKU</span>
                                 <input type="text" name="sku" value="{{ $product->sku }}" class="input input-bordered bg-slate-950/70 text-white">
+                            </label>
+
+                            <label class="form-control">
+                                <span class="label-text mb-2 text-slate-300">Station</span>
+                                <select name="station" class="select select-bordered bg-slate-950/70 text-white" required>
+                                    @foreach (config('pos.product_stations') as $station => $label)
+                                        <option value="{{ $station }}" @selected($product->station === $station)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
                             </label>
 
                             <label class="form-control">

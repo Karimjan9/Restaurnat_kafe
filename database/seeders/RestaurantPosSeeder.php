@@ -36,6 +36,15 @@ class RestaurantPosSeeder extends Seeder
         $roles['cashier']->permissions()->sync(
             $permissions->only(['dashboard.view', 'orders.create', 'orders.view'])->pluck('id')
         );
+        $roles['waiter']->permissions()->sync(
+            $permissions->only(['waiter.panel'])->pluck('id')
+        );
+        $roles['chef']->permissions()->sync(
+            $permissions->only(['kitchen.view'])->pluck('id')
+        );
+        $roles['bartender']->permissions()->sync(
+            $permissions->only(['bar.view'])->pluck('id')
+        );
 
         $mainBranch = Branch::updateOrCreate(
             ['code' => 'MAIN'],
@@ -79,13 +88,13 @@ class RestaurantPosSeeder extends Seeder
         })->keyBy('name');
 
         $products = [
-            ['category' => 'Burgers', 'name' => 'Classic Burger', 'sku' => 'BG-001', 'price' => 42000, 'description' => 'Beef patty, cheese, fries'],
-            ['category' => 'Burgers', 'name' => 'Chicken Burger', 'sku' => 'BG-002', 'price' => 39000, 'description' => 'Crispy chicken, lettuce, sauce'],
-            ['category' => 'Hot Dishes', 'name' => 'Lagman', 'sku' => 'HD-001', 'price' => 36000, 'description' => 'Traditional noodle bowl'],
-            ['category' => 'Hot Dishes', 'name' => 'Shashlik Set', 'sku' => 'HD-002', 'price' => 54000, 'description' => 'Three skewers and garnish'],
-            ['category' => 'Drinks', 'name' => 'Americano', 'sku' => 'DR-001', 'price' => 18000, 'description' => 'Freshly brewed coffee'],
-            ['category' => 'Drinks', 'name' => 'Lemonade', 'sku' => 'DR-002', 'price' => 16000, 'description' => 'House-made cold lemonade'],
-            ['category' => 'Desserts', 'name' => 'Cheesecake', 'sku' => 'DS-001', 'price' => 22000, 'description' => 'Berry cheesecake slice'],
+            ['category' => 'Burgers', 'name' => 'Classic Burger', 'sku' => 'BG-001', 'price' => 42000, 'description' => 'Beef patty, cheese, fries', 'station' => 'kitchen'],
+            ['category' => 'Burgers', 'name' => 'Chicken Burger', 'sku' => 'BG-002', 'price' => 39000, 'description' => 'Crispy chicken, lettuce, sauce', 'station' => 'kitchen'],
+            ['category' => 'Hot Dishes', 'name' => 'Lagman', 'sku' => 'HD-001', 'price' => 36000, 'description' => 'Traditional noodle bowl', 'station' => 'kitchen'],
+            ['category' => 'Hot Dishes', 'name' => 'Shashlik Set', 'sku' => 'HD-002', 'price' => 54000, 'description' => 'Three skewers and garnish', 'station' => 'kitchen'],
+            ['category' => 'Drinks', 'name' => 'Americano', 'sku' => 'DR-001', 'price' => 18000, 'description' => 'Freshly brewed coffee', 'station' => 'bar'],
+            ['category' => 'Drinks', 'name' => 'Lemonade', 'sku' => 'DR-002', 'price' => 16000, 'description' => 'House-made cold lemonade', 'station' => 'bar'],
+            ['category' => 'Desserts', 'name' => 'Cheesecake', 'sku' => 'DS-001', 'price' => 22000, 'description' => 'Berry cheesecake slice', 'station' => 'kitchen'],
         ];
 
         foreach ($products as $product) {
@@ -96,6 +105,7 @@ class RestaurantPosSeeder extends Seeder
                     'name' => $product['name'],
                     'description' => $product['description'],
                     'price' => $product['price'],
+                    'station' => $product['station'],
                     'is_active' => true,
                 ],
             );
@@ -128,6 +138,36 @@ class RestaurantPosSeeder extends Seeder
                 'branch_id' => $mainBranch->id,
                 'role_id' => $roles['cashier']->id,
                 'password' => Hash::make('cashier456'),
+            ],
+        );
+
+        User::updateOrCreate(
+            ['login' => 'waiter'],
+            [
+                'name' => 'Main Waiter',
+                'branch_id' => $mainBranch->id,
+                'role_id' => $roles['waiter']->id,
+                'password' => Hash::make('waiter456'),
+            ],
+        );
+
+        User::updateOrCreate(
+            ['login' => 'chef'],
+            [
+                'name' => 'Head Chef',
+                'branch_id' => $mainBranch->id,
+                'role_id' => $roles['chef']->id,
+                'password' => Hash::make('chef456'),
+            ],
+        );
+
+        User::updateOrCreate(
+            ['login' => 'bartender'],
+            [
+                'name' => 'Bar Tender',
+                'branch_id' => $mainBranch->id,
+                'role_id' => $roles['bartender']->id,
+                'password' => Hash::make('bartender456'),
             ],
         );
     }

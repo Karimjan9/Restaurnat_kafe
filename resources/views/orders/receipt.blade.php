@@ -12,6 +12,7 @@
                         @if ($order->diningTable)
                             | {{ $order->diningTable->name }}
                         @endif
+                        | {{ $order->serviceStatusLabel() }}
                     </p>
                 </div>
 
@@ -51,6 +52,27 @@
 
                 <section class="soft-panel rounded-[2rem] border border-white/10 p-6">
                     <h3 class="text-xl font-semibold text-white">Payment</h3>
+
+                    @if ($order->splits->isNotEmpty())
+                        <div class="mt-4 space-y-3">
+                            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Split bill</p>
+                            @foreach ($order->splits as $split)
+                                <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/50 p-4">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-slate-300">{{ $split->label }}</span>
+                                        <span class="font-semibold text-white">{{ number_format((float) $split->amount) }} so'm</span>
+                                    </div>
+                                    <p class="mt-2 text-sm text-slate-400">
+                                        {{ $split->statusLabel() }}
+                                        @if ($split->paid_at)
+                                            | {{ optional($split->paid_at)->format('d.m.Y H:i') }}
+                                        @endif
+                                    </p>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
                     <div class="mt-4 space-y-3">
                         @foreach ($order->payments as $payment)
                             <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/50 p-4">
@@ -61,6 +83,11 @@
                                 <p class="mt-2 text-xs uppercase tracking-[0.25em] text-slate-500">
                                     {{ optional($payment->paid_at)->format('d.m.Y H:i') }}
                                 </p>
+                                @if ($payment->orderSplit)
+                                    <p class="mt-2 text-sm text-slate-300">
+                                        {{ $payment->orderSplit->label }}
+                                    </p>
+                                @endif
                             </div>
                         @endforeach
                     </div>
@@ -70,9 +97,19 @@
                             <span class="text-slate-300">Total</span>
                             <span class="text-2xl font-semibold text-white">{{ number_format((float) $order->total) }} so'm</span>
                         </div>
+                        @if ($order->waiter)
+                            <p class="mt-2 text-sm text-slate-300">
+                                Waiter: {{ $order->waiter->name }}
+                            </p>
+                        @endif
                         <p class="mt-2 text-sm text-slate-300">
-                            Cashier: {{ $order->cashier?->name }} | {{ optional($order->paid_at)->format('d.m.Y H:i') }}
+                            Cashier: {{ $order->cashier?->name ?? 'N/A' }} | {{ optional($order->paid_at)->format('d.m.Y H:i') }}
                         </p>
+                        @if ($order->closed_at)
+                            <p class="mt-2 text-sm text-slate-300">
+                                Table closed: {{ $order->closedBy?->name ?? 'N/A' }} | {{ optional($order->closed_at)->format('d.m.Y H:i') }}
+                            </p>
+                        @endif
                     </div>
                 </section>
             </div>

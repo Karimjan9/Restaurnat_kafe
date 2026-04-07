@@ -32,59 +32,80 @@
                     </a>
                 @endcan
 
+                @can('waiter.panel')
+                    <a href="{{ route('waiter.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('waiter.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
+                        <span>Waiter Panel</span>
+                        <span class="badge badge-outline">02</span>
+                    </a>
+                @endcan
+
                 @can('orders.create')
                     <a href="{{ route('pos.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('pos.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>POS Terminal</span>
-                        <span class="badge badge-outline">02</span>
+                        <span class="badge badge-outline">03</span>
+                    </a>
+                @endcan
+
+                @can('kitchen.view')
+                    <a href="{{ route('kitchen.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('kitchen.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
+                        <span>Kitchen Queue</span>
+                        <span class="badge badge-outline">04</span>
+                    </a>
+                @endcan
+
+                @can('bar.view')
+                    <a href="{{ route('bar.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('bar.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
+                        <span>Bar Queue</span>
+                        <span class="badge badge-outline">05</span>
                     </a>
                 @endcan
 
                 @can('staff.manage')
                     <a href="{{ route('staff.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('staff.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Staff</span>
-                        <span class="badge badge-outline">03</span>
+                        <span class="badge badge-outline">06</span>
                     </a>
                 @endcan
 
                 @can('roles.manage')
                     <a href="{{ route('roles.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('roles.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Roles</span>
-                        <span class="badge badge-outline">04</span>
+                        <span class="badge badge-outline">07</span>
                     </a>
                 @endcan
 
                 @can('branches.manage')
                     <a href="{{ route('branches.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('branches.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Branches</span>
-                        <span class="badge badge-outline">05</span>
+                        <span class="badge badge-outline">08</span>
                     </a>
                 @endcan
 
                 @can('tables.manage')
                     <a href="{{ route('tables.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('tables.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Tables</span>
-                        <span class="badge badge-outline">06</span>
+                        <span class="badge badge-outline">09</span>
                     </a>
                 @endcan
 
                 @can('categories.manage')
                     <a href="{{ route('categories.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('categories.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Categories</span>
-                        <span class="badge badge-outline">07</span>
+                        <span class="badge badge-outline">10</span>
                     </a>
                 @endcan
 
                 @can('products.manage')
                     <a href="{{ route('products.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('products.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Products</span>
-                        <span class="badge badge-outline">08</span>
+                        <span class="badge badge-outline">11</span>
                     </a>
                 @endcan
 
                 @can('reports.view')
                     <a href="{{ route('reports.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('reports.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Reports</span>
-                        <span class="badge badge-outline">09</span>
+                        <span class="badge badge-outline">12</span>
                     </a>
                 @endcan
             </nav>

@@ -42,4 +42,17 @@ class LoginTest extends TestCase
         $response->assertRedirect(route('pos.index'));
         $this->assertAuthenticated();
     }
+
+    public function test_waiter_is_redirected_to_waiter_panel_after_login(): void
+    {
+        $this->seed(RestaurantPosSeeder::class);
+
+        $response = $this->post(route('login.store'), [
+            'login' => 'waiter',
+            'password' => 'waiter456',
+        ]);
+
+        $response->assertRedirect(route('waiter.index'));
+        $this->assertAuthenticated();
+    }
 }

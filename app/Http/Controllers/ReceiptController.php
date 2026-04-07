@@ -15,7 +15,7 @@ class ReceiptController extends Controller
         }
 
         return view('orders.receipt', [
-            'order' => $order->load(['branch', 'diningTable', 'cashier.role', 'items', 'payments']),
+            'order' => $order->load(['branch', 'diningTable', 'cashier.role', 'waiter.role', 'closedBy.role', 'items', 'splits.paidBy', 'payments.orderSplit']),
         ]);
     }
 }
