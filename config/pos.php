@@ -64,4 +64,6 @@ return [
         'card' => 'Card',
         'transfer' => 'Bank transfer',
     ],
+
+    'waiter_commission_rate' => 0.15,
 ];

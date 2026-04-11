@@ -131,6 +131,8 @@ class StationQueue extends Component
             ->values();
 
         return view('livewire.station-queue', [
+            'station' => $this->station,
+            'branchId' => $this->branchId,
             'branch' => Branch::find($this->branchId),
             'stationLabel' => config("pos.product_stations.{$this->station}", $this->station),
             'orders' => $orders,

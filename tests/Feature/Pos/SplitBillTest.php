@@ -83,21 +83,23 @@ class SplitBillTest extends TestCase
 
     protected function createServedWaiterOrder(): Order
     {
+        $cashier = User::where('login', 'cashier')->firstOrFail();
         $waiter = User::where('login', 'waiter')->firstOrFail();
         $chef = User::where('login', 'chef')->firstOrFail();
         $product = Product::where('station', 'kitchen')->firstOrFail();
 
-        $this->actingAs($waiter);
+        $this->actingAs($cashier);
 
-        Livewire::test(WaiterPanel::class)
+        Livewire::test(PosDashboard::class)
+            ->set('waiterUserId', $waiter->id)
             ->call('addProduct', $product->id)
-            ->call('sendToPreparation')
+            ->call('checkout')
             ->assertHasNoErrors();
 
         $order = Order::firstOrFail();
         $item = OrderItem::where('order_id', $order->id)->firstOrFail();
 
-        $this->assertNull($order->user_id);
+        $this->assertSame($cashier->id, $order->user_id);
         $this->assertSame($waiter->id, $order->waiter_user_id);
 
         $this->actingAs($chef);

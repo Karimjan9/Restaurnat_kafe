@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\DiningTable;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,8 @@ class PosDashboard extends Component
     public ?int $branchId = null;
 
     public ?int $tableId = null;
+
+    public ?int $waiterUserId = null;
 
     public ?int $selectedServiceOrderId = null;
 
@@ -56,6 +59,12 @@ class PosDashboard extends Component
             ?? Branch::where('is_active', true)->value('id');
 
         $this->tableId = $this->availableTables()->first()?->id;
+        $this->waiterUserId = $this->availableWaiters()->first()?->id;
+    }
+
+    public function startNewOrder(): void
+    {
+        $this->resetCheckoutState();
     }
 
     public function setCategory(string $categoryId): void
@@ -124,6 +133,7 @@ class PosDashboard extends Component
     {
         if ($this->orderType === 'dine_in') {
             $this->tableId = $this->availableTables()->first()?->id;
+            $this->waiterUserId = $this->availableWaiters()->first()?->id;
         }
 
         $this->selectedServiceOrderId = null;
@@ -134,8 +144,10 @@ class PosDashboard extends Component
     {
         if ($value !== 'dine_in') {
             $this->tableId = null;
+            $this->waiterUserId = null;
         } else {
             $this->tableId = $this->availableTables()->first()?->id;
+            $this->waiterUserId = $this->availableWaiters()->first()?->id;
         }
 
         if ($value !== 'delivery') {
@@ -160,10 +172,11 @@ class PosDashboard extends Component
             'branchId' => ['required', 'exists:branches,id'],
             'orderType' => ['required', Rule::in(array_keys(config('pos.order_types')))],
             'tableId' => [Rule::requiredIf($this->orderType === 'dine_in'), 'nullable', 'exists:dining_tables,id'],
+            'waiterUserId' => [Rule::requiredIf($this->orderType === 'dine_in'), 'nullable', 'integer', 'exists:users,id'],
             'customerName' => [Rule::requiredIf(in_array($this->orderType, ['takeaway', 'delivery'], true)), 'nullable', 'string', 'max:255'],
             'customerPhone' => [Rule::requiredIf(in_array($this->orderType, ['takeaway', 'delivery'], true)), 'nullable', 'string', 'max:255'],
             'deliveryAddress' => [Rule::requiredIf($this->orderType === 'delivery'), 'nullable', 'string'],
-            'paymentMethod' => ['required', Rule::in(array_keys(config('pos.payment_methods')))],
+            'paymentMethod' => [Rule::requiredIf($this->orderType !== 'dine_in'), 'nullable', Rule::in(array_keys(config('pos.payment_methods')))],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -173,20 +186,28 @@ class PosDashboard extends Component
             return null;
         }
 
+        if ($this->orderType === 'dine_in' && ! $this->availableWaiters()->contains('id', $this->waiterUserId)) {
+            $this->addError('waiterUserId', 'Tanlangan ofitsiant ushbu filialga tegishli emas.');
+
+            return null;
+        }
+
         $cartItems = $this->cartItems();
         $subtotal = $cartItems->sum('line_total');
 
         $order = DB::transaction(function () use ($validated, $cartItems, $subtotal) {
             $now = now();
+            $isServiceOrder = $validated['orderType'] === 'dine_in';
 
             $order = Order::create([
                 'order_number' => $this->generateOrderNumber(),
                 'branch_id' => $validated['branchId'],
                 'dining_table_id' => $validated['tableId'],
                 'user_id' => auth()->id(),
-                'closed_by_user_id' => $validated['orderType'] === 'dine_in' ? auth()->id() : null,
+                'waiter_user_id' => $isServiceOrder ? $validated['waiterUserId'] : null,
+                'closed_by_user_id' => null,
                 'order_type' => $validated['orderType'],
-                'status' => $validated['orderType'] === 'dine_in' ? 'closed' : 'paid',
+                'status' => $isServiceOrder ? 'open' : 'paid',
                 'customer_name' => $validated['customerName'] ?: null,
                 'customer_phone' => $validated['customerPhone'] ?: null,
                 'delivery_address' => $validated['deliveryAddress'] ?: null,
@@ -194,8 +215,8 @@ class PosDashboard extends Component
                 'subtotal' => $subtotal,
                 'total' => $subtotal,
                 'placed_at' => $now,
-                'paid_at' => $now,
-                'closed_at' => $validated['orderType'] === 'dine_in' ? $now : null,
+                'paid_at' => $isServiceOrder ? null : $now,
+                'closed_at' => null,
             ]);
 
             foreach ($cartItems as $item) {
@@ -206,23 +227,31 @@ class PosDashboard extends Component
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['price'],
                     'line_total' => $item['line_total'],
-                    'preparation_status' => 'served',
+                    'preparation_status' => $isServiceOrder ? 'queued' : 'served',
                     'sent_to_station_at' => $now,
-                    'started_preparing_at' => $now,
-                    'ready_at' => $now,
-                    'served_at' => $now,
+                    'started_preparing_at' => $isServiceOrder ? null : $now,
+                    'ready_at' => $isServiceOrder ? null : $now,
+                    'served_at' => $isServiceOrder ? null : $now,
                 ]);
             }
 
-            $order->payments()->create([
-                'user_id' => auth()->id(),
-                'method' => $validated['paymentMethod'],
-                'amount' => $subtotal,
-                'paid_at' => $now,
-            ]);
+            if ($isServiceOrder) {
+                $order->refreshPreparationStatus();
+            } else {
+                $order->payments()->create([
+                    'user_id' => auth()->id(),
+                    'method' => $validated['paymentMethod'],
+                    'amount' => $subtotal,
+                    'paid_at' => $now,
+                ]);
+            }
 
             return $order;
         });
+
+        $serviceStations = $order->order_type === 'dine_in'
+            ? $order->items()->distinct()->pluck('station')->filter()->values()
+            : collect();
 
         $this->resetCheckoutState();
         OperationsUpdated::dispatch(
@@ -231,7 +260,27 @@ class PosDashboard extends Component
             orderId: $order->id,
             meta: ['order_type' => $order->order_type],
         );
-        session()->flash('status', 'Order muvaffaqiyatli yaratildi.');
+
+        foreach ($serviceStations as $station) {
+            OperationsUpdated::dispatch(
+                type: 'station.order.queued',
+                branchId: $order->branch_id,
+                orderId: $order->id,
+                station: $station,
+                meta: [
+                    'table' => $order->diningTable?->name,
+                    'waiter' => $order->waiter?->name,
+                    'items' => $order->items()->where('station', $station)->sum('quantity'),
+                ],
+            );
+        }
+
+        session()->flash(
+            'status',
+            $order->order_type === 'dine_in'
+                ? "Order yaratildi va {$order->waiter?->name} ga biriktirildi."
+                : 'Order muvaffaqiyatli yaratildi.'
+        );
 
         return redirect()->route('orders.receipt', $order);
     }
@@ -587,6 +636,19 @@ class PosDashboard extends Component
             ->get();
     }
 
+    protected function availableWaiters(): Collection
+    {
+        if (! $this->branchId) {
+            return collect();
+        }
+
+        return User::query()
+            ->where('branch_id', $this->branchId)
+            ->whereHas('role', fn (Builder $query) => $query->where('name', 'waiter'))
+            ->orderBy('name')
+            ->get();
+    }
+
     protected function settlementOrdersQuery(): Builder
     {
         return Order::query()
@@ -670,6 +732,7 @@ class PosDashboard extends Component
         $this->categoryId = 'all';
         $this->orderType = 'dine_in';
         $this->tableId = $this->availableTables()->first()?->id;
+        $this->waiterUserId = $this->availableWaiters()->first()?->id;
         $this->customerName = '';
         $this->customerPhone = '';
         $this->deliveryAddress = '';
@@ -746,6 +809,7 @@ class PosDashboard extends Component
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(),
             'categories' => Category::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(),
             'availableTables' => $this->availableTables(),
+            'waiters' => $this->availableWaiters(),
             'products' => $products,
             'serviceOrders' => $serviceOrders,
             'selectedServiceOrder' => $selectedServiceOrder,

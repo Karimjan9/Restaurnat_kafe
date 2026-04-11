@@ -26,7 +26,7 @@ class WaiterPerformanceReportTest extends TestCase
         $cashier = User::where('login', 'cashier')->firstOrFail();
         $manager = User::where('login', 'manager')->firstOrFail();
 
-        $order = $this->createServedWaiterOrder();
+        $order = $this->createServedWaiterOrder($waiter);
 
         $this->actingAs($cashier);
 
@@ -49,22 +49,24 @@ class WaiterPerformanceReportTest extends TestCase
             return $waiterPerformance->contains(function ($row) use ($waiter, $order) {
                 return (int) $row->id === $waiter->id
                     && (int) $row->orders_count === 1
-                    && (float) $row->revenue === (float) $order->total;
+                    && (float) $row->revenue === (float) $order->total
+                    && (float) $row->commission === (float) $order->waiterCommissionAmount();
             });
         });
     }
 
-    protected function createServedWaiterOrder(): Order
+    protected function createServedWaiterOrder(User $waiter): Order
     {
-        $waiter = User::where('login', 'waiter')->firstOrFail();
+        $cashier = User::where('login', 'cashier')->firstOrFail();
         $chef = User::where('login', 'chef')->firstOrFail();
         $product = Product::where('station', 'kitchen')->firstOrFail();
 
-        $this->actingAs($waiter);
+        $this->actingAs($cashier);
 
-        Livewire::test(WaiterPanel::class)
+        Livewire::test(PosDashboard::class)
+            ->set('waiterUserId', $waiter->id)
             ->call('addProduct', $product->id)
-            ->call('sendToPreparation')
+            ->call('checkout')
             ->assertHasNoErrors();
 
         $order = Order::firstOrFail();

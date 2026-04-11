@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Service;
 
+use App\Livewire\PosDashboard;
 use App\Livewire\StationQueue;
 use App\Livewire\WaiterPanel;
 use App\Models\Order;
@@ -17,21 +18,23 @@ class WaiterStationFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_waiter_can_send_items_to_kitchen_and_bar(): void
+    public function test_cashier_created_items_are_routed_to_kitchen_and_bar_for_assigned_waiter(): void
     {
         $this->seed(RestaurantPosSeeder::class);
 
+        $cashier = User::where('login', 'cashier')->firstOrFail();
         $waiter = User::where('login', 'waiter')->firstOrFail();
         $kitchenProduct = Product::where('station', 'kitchen')->firstOrFail();
         $barProduct = Product::where('station', 'bar')->firstOrFail();
 
-        $this->actingAs($waiter);
+        $this->actingAs($cashier);
 
-        Livewire::test(WaiterPanel::class)
+        Livewire::test(PosDashboard::class)
+            ->set('waiterUserId', $waiter->id)
             ->call('addProduct', $kitchenProduct->id)
             ->call('addProduct', $barProduct->id)
             ->set('notes', 'First service round')
-            ->call('sendToPreparation')
+            ->call('checkout')
             ->assertHasNoErrors();
 
         $order = Order::with('items')->first();
@@ -39,7 +42,7 @@ class WaiterStationFlowTest extends TestCase
         $this->assertNotNull($order);
         $this->assertSame('dine_in', $order->order_type);
         $this->assertSame('open', $order->status);
-        $this->assertNull($order->user_id);
+        $this->assertSame($cashier->id, $order->user_id);
         $this->assertSame($waiter->id, $order->waiter_user_id);
         $this->assertNull($order->paid_at);
         $this->assertCount(2, $order->items);
@@ -47,7 +50,7 @@ class WaiterStationFlowTest extends TestCase
         $this->assertTrue($order->items->every(fn (OrderItem $item) => $item->preparation_status === 'queued'));
     }
 
-    public function test_ready_items_can_move_from_chef_queue_back_to_waiter_service(): void
+    public function test_ready_items_can_move_from_station_queue_back_to_assigned_waiter_service(): void
     {
         $this->seed(RestaurantPosSeeder::class);
 
@@ -55,14 +58,7 @@ class WaiterStationFlowTest extends TestCase
         $chef = User::where('login', 'chef')->firstOrFail();
         $kitchenProduct = Product::where('station', 'kitchen')->firstOrFail();
 
-        $this->actingAs($waiter);
-
-        Livewire::test(WaiterPanel::class)
-            ->call('addProduct', $kitchenProduct->id)
-            ->call('sendToPreparation')
-            ->assertHasNoErrors();
-
-        $order = Order::firstOrFail();
+        $order = $this->createServiceOrderByCashier($waiter, $kitchenProduct);
         $item = OrderItem::where('station', 'kitchen')->firstOrFail();
 
         $this->actingAs($chef);
@@ -90,5 +86,20 @@ class WaiterStationFlowTest extends TestCase
         $this->assertSame('served', $item->preparation_status);
         $this->assertSame('served', $order->status);
         $this->assertSame($waiter->id, $order->waiter_user_id);
+    }
+
+    protected function createServiceOrderByCashier(User $waiter, Product $product): Order
+    {
+        $cashier = User::where('login', 'cashier')->firstOrFail();
+
+        $this->actingAs($cashier);
+
+        Livewire::test(PosDashboard::class)
+            ->set('waiterUserId', $waiter->id)
+            ->call('addProduct', $product->id)
+            ->call('checkout')
+            ->assertHasNoErrors();
+
+        return Order::firstOrFail();
     }
 }
