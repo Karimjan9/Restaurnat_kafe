@@ -123,6 +123,11 @@ class Order extends Model
         return config("pos.service_order_statuses.{$this->status}", $this->status);
     }
 
+    public function waiterCommissionAmount(): float
+    {
+        return round((float) $this->total * (float) config('pos.waiter_commission_rate', 0.15), 2);
+    }
+
     public function refreshPreparationStatus(): void
     {
         if (in_array($this->status, self::financialStatuses(), true)) {
@@ -138,7 +143,7 @@ class Order extends Model
             $status = 'served';
         } elseif ($statuses->every(fn (string $status) => in_array($status, ['ready', 'served'], true))) {
             $status = 'ready';
-        } elseif ($statuses->contains('preparing')) {
+        } elseif ($statuses->contains(fn (string $status) => $status !== 'queued')) {
             $status = 'in_service';
         } else {
             $status = 'open';

@@ -35,7 +35,7 @@
             </div>
         </section>
 
-        <section class="grid gap-4 md:grid-cols-3">
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
                 <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Gross sales</p>
                 <p class="mt-3 text-3xl font-semibold text-white">{{ number_format((float) $grossSales) }} so'm</p>
@@ -47,6 +47,11 @@
             <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
                 <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Average order</p>
                 <p class="mt-3 text-3xl font-semibold text-white">{{ number_format((float) $averageOrderValue) }} so'm</p>
+            </div>
+            <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Waiter commission</p>
+                <p class="mt-3 text-3xl font-semibold text-violet-300">{{ number_format((float) $totalWaiterCommission) }} so'm</p>
+                <p class="mt-2 text-sm text-slate-400">Range bo'yicha {{ number_format($commissionRate * 100, 0) }}% commission pool</p>
             </div>
         </section>
 
@@ -110,6 +115,7 @@
                             <th>Waiter</th>
                             <th>Orders</th>
                             <th>Revenue</th>
+                            <th>Commission</th>
                             <th>Average</th>
                         </tr>
                     </thead>
@@ -119,11 +125,12 @@
                                 <td>{{ $waiter->name }}</td>
                                 <td>{{ $waiter->orders_count }}</td>
                                 <td>{{ number_format((float) $waiter->revenue) }} so'm</td>
+                                <td>{{ number_format((float) $waiter->commission) }} so'm</td>
                                 <td>{{ number_format((float) $waiter->revenue / max(1, $waiter->orders_count)) }} so'm</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="text-slate-400">Bu oraliqda waiter orderlari hali yo'q.</td>
+                                <td colspan="5" class="text-slate-400">Bu oraliqda waiter orderlari hali yo'q.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -144,6 +151,7 @@
                             <th>Type</th>
                             <th>Waiter</th>
                             <th>Cashier</th>
+                            <th>Commission</th>
                             <th>Total</th>
                             <th></th>
                         </tr>
@@ -156,14 +164,18 @@
                                 <td>{{ config('pos.order_types')[$order->order_type] ?? $order->order_type }}</td>
                                 <td>{{ $order->waiter?->name ?? 'N/A' }}</td>
                                 <td>{{ $order->cashier?->name ?? 'N/A' }}</td>
+                                <td>{{ $order->waiter ? number_format($order->waiterCommissionAmount()) : '0' }} so'm</td>
                                 <td>{{ number_format((float) $order->total) }} so'm</td>
                                 <td>
-                                    <a href="{{ route('orders.receipt', $order) }}" class="btn btn-xs btn-outline btn-warning">Receipt</a>
+                                    <div class="flex flex-wrap gap-2">
+                                        <a href="{{ route('orders.receipt', $order) }}" class="btn btn-xs btn-outline btn-warning">Receipt</a>
+                                        <a href="{{ route('orders.check', $order) }}" target="_blank" rel="noopener" class="btn btn-xs btn-warning">Check</a>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-slate-400">Bu oraliqda order yo'q.</td>
+                                <td colspan="8" class="text-slate-400">Bu oraliqda order yo'q.</td>
                             </tr>
                         @endforelse
                     </tbody>

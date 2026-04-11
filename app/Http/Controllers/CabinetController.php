@@ -68,7 +68,7 @@ class CabinetController extends Controller
             'waiter' => [
                 'eyebrow' => 'Waiter cabinet',
                 'title' => 'Servis va stol boshqaruv kabineti',
-                'description' => "Aktiv stollar, ready itemlar va yangi ticket yuborish oqimini kuzatish uchun panel.",
+                'description' => "Sizga biriktirilgan bugungi orderlar, ready itemlar va kunlik komissiyani kuzatish uchun panel.",
             ],
             'chef' => [
                 'eyebrow' => 'Kitchen cabinet',
@@ -111,7 +111,7 @@ class CabinetController extends Controller
             ],
             [
                 'label' => 'Waiter Panel',
-                'description' => 'Stollar va service ticket oqimi.',
+                'description' => 'Biriktirilgan orderlar, topshirish va kunlik komissiya.',
                 'route' => 'waiter.index',
                 'permission' => 'waiter.panel',
             ],
@@ -209,31 +209,39 @@ class CabinetController extends Controller
             ],
             'waiter' => [
                 [
-                    'label' => 'My active tables',
+                    'label' => 'Today orders',
                     'value' => $this->waiterOrdersQuery($user)->count(),
-                    'hint' => "Sizga biriktirilgan stol orderlari",
+                    'hint' => "Bugun sizga biriktirilgan orderlar",
                 ],
                 [
                     'label' => 'Ready to serve',
                     'value' => Order::query()
                         ->where('branch_id', $scopeBranchId)
                         ->where('waiter_user_id', $user->id)
+                        ->whereDate('placed_at', $today)
                         ->whereIn('status', ['ready'])
                         ->count(),
                     'hint' => 'Darhol servisga tayyor',
                 ],
                 [
-                    'label' => 'Branch service',
-                    'value' => Order::query()
+                    'label' => 'Today paid revenue',
+                    'value' => number_format((float) Order::query()
                         ->where('branch_id', $scopeBranchId)
-                        ->whereIn('status', Order::activeStatuses())
-                        ->count(),
-                    'hint' => 'Filialdagi aktiv orderlar',
+                        ->where('waiter_user_id', $user->id)
+                        ->whereIn('status', Order::financialStatuses())
+                        ->whereDate('paid_at', $today)
+                        ->sum('total'))." so'm",
+                    'hint' => "Bugun to'langan orderlar",
                 ],
                 [
-                    'label' => 'Tables available',
-                    'value' => DiningTable::query()->where('branch_id', $scopeBranchId)->where('is_active', true)->count(),
-                    'hint' => 'Aktiv stol fondi',
+                    'label' => 'My commission',
+                    'value' => number_format((float) Order::query()
+                        ->where('branch_id', $scopeBranchId)
+                        ->where('waiter_user_id', $user->id)
+                        ->whereIn('status', Order::financialStatuses())
+                        ->whereDate('paid_at', $today)
+                        ->sum('total') * (float) config('pos.waiter_commission_rate', 0.15))." so'm",
+                    'hint' => "Bugungi tushumdan ".number_format((float) config('pos.waiter_commission_rate', 0.15) * 100, 0).'%',
                 ],
             ],
             'chef', 'bartender' => [
@@ -356,8 +364,10 @@ class CabinetController extends Controller
     {
         return Order::query()
             ->where('branch_id', $user->branch_id)
+            ->where('order_type', 'dine_in')
             ->where('waiter_user_id', $user->id)
-            ->whereIn('status', Order::activeStatuses());
+            ->whereDate('placed_at', now()->toDateString())
+            ->whereIn('status', array_merge(Order::settlementStatuses(), ['closed']));
     }
 
     protected function stationMetric(string $station, ?int $branchId, string $status): int

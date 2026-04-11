@@ -7,6 +7,9 @@
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
                     Bu ekranda faqat sizning stansiyangizga yuborilgan itemlar ko'rinadi. Har bir item navbatdan tayyor holatiga o'tkaziladi.
                 </p>
+                <p class="mt-2 text-xs uppercase tracking-[0.24em] text-emerald-300">
+                    Auto-sound notification yoqilgan. Yangi ticket kelganda signal chaladi.
+                </p>
             </div>
 
             <div class="grid gap-3 sm:grid-cols-4">
@@ -59,6 +62,14 @@
                         </div>
                     </div>
                 </div>
+
+                @if ($order)
+                    <div class="mt-4 flex justify-end">
+                        <a href="{{ route('stations.ticket', ['station' => $station, 'order' => $order]) }}" target="_blank" rel="noopener" class="btn btn-outline btn-sm rounded-2xl">
+                            Print ticket
+                        </a>
+                    </div>
+                @endif
 
                 @if ($order?->notes)
                     <div class="mt-4 rounded-[1.5rem] border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
@@ -114,3 +125,5 @@
         @endforelse
     </section>
 </div>
+
+@include('stations.partials.notifier', ['station' => $station, 'branchId' => $branchId])

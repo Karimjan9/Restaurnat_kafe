@@ -52,7 +52,7 @@
 
             <form id="loginForm" action="{{ route('login.store') }}" method="POST" class="mt-8 space-y-5">
                 @csrf
-
+                    
                 <label class="block">
                     <span class="mb-2 block text-sm text-slate-300">Login</span>
                     <input
@@ -92,7 +92,7 @@
                         </button>
                     </div>
                 </label>
-
+                
                 <label class="flex items-center gap-3 text-sm text-slate-300">
                     <input type="checkbox" name="remember" value="1" class="checkbox checkbox-sm">
                     Meni eslab qol
@@ -125,6 +125,9 @@
                     form.submit();
                 });
             });
-        });
+        }); 
     </script>
 @endsection
+
+
+

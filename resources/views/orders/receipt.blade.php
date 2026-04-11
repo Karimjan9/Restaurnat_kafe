@@ -18,6 +18,9 @@
 
                 <div class="flex gap-2">
                     <a href="{{ route('pos.index') }}" class="btn btn-warning">New order</a>
+                    @if ($order->payments->isNotEmpty())
+                        <a href="{{ route('orders.check', $order) }}" target="_blank" rel="noopener" class="btn btn-outline btn-warning">Print check</a>
+                    @endif
                     <button type="button" onclick="window.print()" class="btn btn-outline">Print</button>
                 </div>
             </div>
