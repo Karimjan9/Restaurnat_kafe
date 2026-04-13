@@ -79,15 +79,7 @@ class SettleWaiterOrderTest extends TestCase
         $waiter = User::where('login', 'waiter')->firstOrFail();
         $cashier = User::where('login', 'cashier')->firstOrFail();
         $product = Product::where('station', 'kitchen')->firstOrFail();
-
-        $this->actingAs($waiter);
-
-        Livewire::test(WaiterPanel::class)
-            ->call('addProduct', $product->id)
-            ->call('sendToPreparation')
-            ->assertHasNoErrors();
-
-        $order = Order::firstOrFail();
+        $order = $this->createOpenServiceOrder($waiter, $product);
 
         $this->actingAs($cashier);
 
@@ -126,53 +118,62 @@ class SettleWaiterOrderTest extends TestCase
         $this->assertNull($order->closed_at);
     }
 
-    public function test_waiter_cannot_add_new_items_until_paid_table_is_closed(): void
+    public function test_waiter_panel_is_scoped_to_logged_in_waiter_and_shows_daily_commission(): void
     {
         $this->seed(RestaurantPosSeeder::class);
 
-        $order = $this->createServedWaiterOrder();
-        $cashier = User::where('login', 'cashier')->firstOrFail();
         $waiter = User::where('login', 'waiter')->firstOrFail();
-        $product = Product::where('station', 'bar')->firstOrFail();
+        $otherWaiter = User::factory()->create([
+            'name' => 'Second Waiter',
+            'login' => 'waiter_two',
+            'branch_id' => $waiter->branch_id,
+            'role_id' => $waiter->role_id,
+            'password' => 'password123',
+        ]);
+        $product = Product::where('station', 'kitchen')->firstOrFail();
+
+        $myOrder = $this->createServedWaiterOrder($waiter, $product);
+        $this->payServiceOrder($myOrder);
+
+        $otherOrder = $this->createServedWaiterOrder($otherWaiter, $product);
+        $this->payServiceOrder($otherOrder);
+
+        $this->actingAs($waiter);
+
+        Livewire::test(WaiterPanel::class)
+            ->assertViewHas('orders', function ($orders) use ($myOrder, $otherOrder) {
+                return $orders->contains('id', $myOrder->id)
+                    && ! $orders->contains('id', $otherOrder->id);
+            })
+            ->assertViewHas('dailyCommission', function ($dailyCommission) use ($myOrder) {
+                return abs((float) $dailyCommission - (float) $myOrder->waiterCommissionAmount()) < 0.0001;
+            });
+    }
+
+    protected function createOpenServiceOrder(User $waiter, ?Product $product = null): Order
+    {
+        $cashier = User::where('login', 'cashier')->firstOrFail();
+        $product ??= Product::where('station', 'kitchen')->firstOrFail();
 
         $this->actingAs($cashier);
 
         Livewire::test(PosDashboard::class)
-            ->call('selectServiceOrder', $order->id)
-            ->call('completeServiceOrderPayment')
+            ->set('waiterUserId', $waiter->id)
+            ->call('addProduct', $product->id)
+            ->call('checkout')
             ->assertHasNoErrors();
 
-        $order->refresh();
-
-        $this->assertSame('paid', $order->status);
-
-        $this->actingAs($waiter);
-
-        Livewire::test(WaiterPanel::class)
-            ->set('selectedTableId', $order->dining_table_id)
-            ->call('addProduct', $product->id)
-            ->call('sendToPreparation')
-            ->assertHasErrors('selectedTableId');
+        return Order::latest('id')->firstOrFail();
     }
 
-    protected function createServedWaiterOrder(): Order
+    protected function createServedWaiterOrder(?User $waiter = null, ?Product $product = null): Order
     {
-        $waiter = User::where('login', 'waiter')->firstOrFail();
+        $waiter ??= User::where('login', 'waiter')->firstOrFail();
         $chef = User::where('login', 'chef')->firstOrFail();
-        $product = Product::where('station', 'kitchen')->firstOrFail();
+        $product ??= Product::where('station', 'kitchen')->firstOrFail();
 
-        $this->actingAs($waiter);
-
-        Livewire::test(WaiterPanel::class)
-            ->call('addProduct', $product->id)
-            ->call('sendToPreparation')
-            ->assertHasNoErrors();
-
-        $order = Order::firstOrFail();
+        $order = $this->createOpenServiceOrder($waiter, $product);
         $item = OrderItem::where('order_id', $order->id)->firstOrFail();
-
-        $this->assertNull($order->user_id);
-        $this->assertSame($waiter->id, $order->waiter_user_id);
 
         $this->actingAs($chef);
 
@@ -188,5 +189,17 @@ class SettleWaiterOrderTest extends TestCase
             ->assertHasNoErrors();
 
         return $order->fresh();
+    }
+
+    protected function payServiceOrder(Order $order): void
+    {
+        $cashier = User::where('login', 'cashier')->firstOrFail();
+
+        $this->actingAs($cashier);
+
+        Livewire::test(PosDashboard::class)
+            ->call('selectServiceOrder', $order->id)
+            ->call('completeServiceOrderPayment')
+            ->assertHasNoErrors();
     }
 }

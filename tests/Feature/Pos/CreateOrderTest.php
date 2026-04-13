@@ -15,16 +15,18 @@ class CreateOrderTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_cashier_can_create_and_auto_close_a_dine_in_order(): void
+    public function test_cashier_can_create_a_dine_in_service_order_with_waiter_assignment(): void
     {
         $this->seed(RestaurantPosSeeder::class);
 
         $cashier = User::where('login', 'cashier')->firstOrFail();
+        $waiter = User::where('login', 'waiter')->firstOrFail();
         $product = Product::firstOrFail();
 
         $this->actingAs($cashier);
 
         Livewire::test(PosDashboard::class)
+            ->set('waiterUserId', $waiter->id)
             ->call('addProduct', $product->id)
             ->call('checkout')
             ->assertHasNoErrors();
@@ -32,11 +34,14 @@ class CreateOrderTest extends TestCase
         $order = Order::with(['items', 'payments'])->first();
 
         $this->assertNotNull($order);
-        $this->assertSame('closed', $order->status);
+        $this->assertSame('open', $order->status);
         $this->assertSame('dine_in', $order->order_type);
         $this->assertNotNull($order->dining_table_id);
-        $this->assertNotNull($order->closed_at);
+        $this->assertSame($waiter->id, $order->waiter_user_id);
+        $this->assertNull($order->paid_at);
+        $this->assertNull($order->closed_at);
         $this->assertCount(1, $order->items);
-        $this->assertCount(1, $order->payments);
+        $this->assertCount(0, $order->payments);
+        $this->assertTrue($order->items->every(fn ($item) => $item->preparation_status === 'queued'));
     }
 }

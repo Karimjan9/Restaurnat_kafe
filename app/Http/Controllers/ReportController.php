@@ -19,6 +19,8 @@ class ReportController extends Controller
         $dateFrom = Carbon::parse($request->input('date_from', now()->toDateString()))->startOfDay();
         $dateTo = Carbon::parse($request->input('date_to', now()->toDateString()))->endOfDay();
         $branchId = $request->integer('branch_id') ?: null;
+        $commissionRate = (float) config('pos.waiter_commission_rate', 0.15);
+        $commissionRateSql = number_format($commissionRate, 4, '.', '');
 
         $ordersQuery = Order::query()
             ->whereIn('status', Order::financialStatuses())
@@ -56,7 +58,8 @@ class ReportController extends Controller
                 'users.id',
                 'users.name',
                 DB::raw('COUNT(orders.id) as orders_count'),
-                DB::raw('SUM(orders.total) as revenue')
+                DB::raw('SUM(orders.total) as revenue'),
+                DB::raw("ROUND(SUM(orders.total) * {$commissionRateSql}, 2) as commission")
             )
             ->join('orders', 'orders.waiter_user_id', '=', 'users.id')
             ->whereIn('orders.status', Order::financialStatuses())
@@ -83,6 +86,8 @@ class ReportController extends Controller
             'grossSales' => $grossSales,
             'orderCount' => $orderCount,
             'averageOrderValue' => $orderCount > 0 ? $grossSales / $orderCount : 0,
+            'commissionRate' => $commissionRate,
+            'totalWaiterCommission' => (float) $waiterPerformance->sum('commission'),
             'paymentBreakdown' => $paymentBreakdown,
             'orderTypeBreakdown' => $orderTypeBreakdown,
             'topProducts' => $topProducts,

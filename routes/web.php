@@ -11,6 +11,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\StationTicketController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
 
@@ -43,6 +44,10 @@ Route::middleware('auth')->group(function () {
     Route::view('/bar', 'stations.bar')
         ->middleware('can:bar.view')
         ->name('bar.index');
+
+    Route::get('/stations/{station}/orders/{order}/ticket', [StationTicketController::class, 'show'])
+        ->middleware('auth')
+        ->name('stations.ticket');
 
     Route::view('/pos', 'pos.index')
         ->middleware('can:orders.create')
@@ -129,6 +134,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders/{order}/receipt', [ReceiptController::class, 'show'])
         ->middleware('can:orders.view')
         ->name('orders.receipt');
+    Route::get('/orders/{order}/check', [ReceiptController::class, 'check'])
+        ->middleware('can:orders.view')
+        ->name('orders.check');
 
     Route::get('/reports', ReportController::class)
         ->middleware('can:reports.view')

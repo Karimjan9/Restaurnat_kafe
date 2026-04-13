@@ -189,7 +189,7 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-xs uppercase tracking-[0.3em] text-slate-400">My service orders</p>
-                            <h3 class="mt-2 text-xl font-semibold text-white">Sizga biriktirilgan aktiv stollar</h3>
+                            <h3 class="mt-2 text-xl font-semibold text-white">Sizning bugungi orderlaringiz</h3>
                         </div>
                         <a href="{{ route('waiter.index') }}" class="btn btn-warning btn-sm rounded-2xl">Open waiter panel</a>
                     </div>
@@ -221,7 +221,7 @@
                             </article>
                         @empty
                             <div class="rounded-[1.5rem] border border-dashed border-white/10 bg-slate-950/40 p-6 text-center text-slate-400">
-                                Sizda hozircha aktiv stol orderi yo'q.
+                                Sizga bugun hali order biriktirilmagan.
                             </div>
                         @endforelse
                     </div>

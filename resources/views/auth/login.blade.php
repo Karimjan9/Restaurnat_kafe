@@ -106,12 +106,20 @@
             </label>
 
 
+
             <label class="block">
                 <span class="mb-2 block text-sm text-slate-300">
                     Parol
                 </span>
 
                 <div class="relative">
+
+
+            <form id="loginForm" action="{{ route('login.store') }}" method="POST" class="mt-8 space-y-5">
+                @csrf
+                    
+                <label class="block">
+                    <span class="mb-2 block text-sm text-slate-300">Login</span>
 
                     <input
                         id="password"
@@ -121,15 +129,27 @@
                         autocomplete="current-password"
                         class="input input-bordered w-full rounded-2xl bg-slate-950/70 pr-14 text-white"
                         placeholder="password"
-                    >
+                    
 
                     <button id="togglePassword"
                             type="button"
+
                             class="absolute inset-y-0 right-0 px-4 text-sm text-slate-400 hover:text-white">
                         Show
                     </button>
 
                 </div>
+
+
+                        </button>
+                    </div>
+                </label>
+                
+                <label class="flex items-center gap-3 text-sm text-slate-300">
+                    <input type="checkbox" name="remember" value="1" class="checkbox checkbox-sm">
+                    Meni eslab qol
+                </label>
+
 
             </label>
 
@@ -173,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 togglePassword.innerText = 'Show';
             }
 
+
         });
     }
 
@@ -196,5 +217,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
 });
 </script>
+{{-- 
 
+          document.querySelectorAll('.demo-account').forEach((button) => {
+                button.addEventListener('click', () => {
+                    loginInput.value = button.dataset.login ?? '';
+                    passwordInput.value = button.dataset.password ?? '';
+                    form.submit();
+                });
+            });
+        });  --}}
+    </script>
 @endsection
+
+
+

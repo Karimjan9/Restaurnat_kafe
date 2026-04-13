@@ -90,9 +90,14 @@
                             @forelse ($recentOrders as $order)
                                 <tr>
                                     <td>
-                                        <a href="{{ route('orders.receipt', $order) }}" class="font-medium text-amber-200 hover:text-white">
-                                            {{ $order->order_number }}
-                                        </a>
+                                        <div class="flex flex-col gap-2">
+                                            <a href="{{ route('orders.receipt', $order) }}" class="font-medium text-amber-200 hover:text-white">
+                                                {{ $order->order_number }}
+                                            </a>
+                                            <a href="{{ route('orders.check', $order) }}" target="_blank" rel="noopener" class="text-xs font-medium text-amber-100 hover:text-white">
+                                                Print check
+                                            </a>
+                                        </div>
                                     </td>
                                     <td>{{ $order->branch?->name }}</td>
                                     <td>{{ config('pos.order_types')[$order->order_type] ?? $order->order_type }}</td>
