@@ -95,14 +95,14 @@ class StationQueue extends Component
                     ->whereIn('status', Order::activeStatuses())
                     ->where('branch_id', $this->branchId);
             })
-            ->with(['order.diningTable', 'order.branch'])
+            ->with(['order.diningTable', 'order.branch', 'modifiers'])
             ->firstOrFail();
     }
 
     public function render()
     {
         $items = OrderItem::query()
-            ->with(['order.branch', 'order.diningTable'])
+            ->with(['order.branch', 'order.diningTable', 'modifiers'])
             ->where('station', $this->station)
             ->whereIn('preparation_status', ['queued', 'preparing', 'ready'])
             ->whereHas('order', function (Builder $query) {

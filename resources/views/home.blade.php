@@ -1,65 +1,199 @@
 @extends('layouts.auth')
 
 @php
+    $perPage = 12;
     $initialCategory = $menuCatalog->first();
-    $initialItems = collect($initialCategory['items'] ?? []);
-    $initialVisibleItems = $initialItems->take(9);
+    $initialItems = collect($initialCategory['items'] ?? [])->values();
+    $initialVisibleItems = $initialItems->take($perPage);
     $initialItem = $initialVisibleItems->first();
-    $initialPages = max(1, (int) ceil($initialItems->count() / 9));
+    $initialPages = max(1, (int) ceil($initialItems->count() / $perPage));
+
+    $formatMoney = static fn (float|int $value): string => number_format((float) $value, 0, '.', ' ') . " so'm";
+    $itemInitials = static function (string $name): string {
+        $normalized = preg_replace('/[^A-Za-z0-9]/', '', $name) ?: $name;
+
+        return \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($normalized, 0, 2));
+    };
+
+    $menuLookup = $menuCatalog->reduce(function ($carry, array $category) {
+        foreach ($category['items'] ?? [] as $item) {
+            $carry->put((string) $item['id'], $item + [
+                'categoryName' => $category['name'],
+                'categorySlug' => $category['slug'],
+                'theme' => $category['theme'],
+                'cue' => $category['cue'],
+            ]);
+        }
+
+        return $carry;
+    }, collect());
+
+    $initialCartSeed = collect();
+    if ($initialItems->isNotEmpty()) {
+        $initialCartSeed->push(['id' => $initialItems[0]['id'], 'quantity' => 2]);
+    }
+    if ($initialItems->count() > 1) {
+        $initialCartSeed->push(['id' => $initialItems[1]['id'], 'quantity' => 1]);
+    }
+    if ($initialItems->count() > 2) {
+        $initialCartSeed->push(['id' => $initialItems[2]['id'], 'quantity' => 1]);
+    }
+
+    $initialCartLines = $initialCartSeed
+        ->map(function (array $seed) use ($menuLookup) {
+            $item = $menuLookup->get((string) $seed['id']);
+
+            if (! $item) {
+                return null;
+            }
+
+            $quantity = (int) $seed['quantity'];
+
+            return $item + [
+                'quantity' => $quantity,
+                'lineTotal' => $quantity * (float) $item['price'],
+            ];
+        })
+        ->filter()
+        ->values();
+
+    $initialItemCount = (int) $initialCartLines->sum('quantity');
+    $initialSubtotal = (float) $initialCartLines->sum('lineTotal');
 @endphp
 
 @section('content')
-    <div class="self-start w-full">
-        <section
-            id="menuBrowserShell"
-            class="menu-browser-shell soft-panel rounded-[2.2rem] border border-white/10 p-4 sm:p-6 lg:p-8"
-            data-view-mode="signature"
-        >
-            <header class="menu-browser-header border-b border-white/10 pb-6">
-                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="flex min-w-0 items-center gap-4">
-                        <div class="cafe-mark">
-                            CP
-                        </div>
+    <div class="w-full self-start">
+        <section id="posPremiumShell" class="pos-premium-shell soft-panel">
+            <aside class="pos-premium-rail">
+                <div class="pos-premium-rail-brand">CP</div>
+                <button type="button" class="pos-premium-rail-button is-active">POS</button>
+                <button type="button" class="pos-premium-rail-button">MN</button>
+                <button type="button" class="pos-premium-rail-button">RC</button>
+                <div class="pos-premium-rail-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </aside>
 
-                        <div class="min-w-0">
-                            <p class="menu-browser-kicker">Cafe landing</p>
-                            <h1 class="cafe-display truncate text-3xl text-white sm:text-4xl">
-                                {{ config('app.name', 'Restaurant POS') }}
-                            </h1>
+            <aside class="pos-premium-cart">
+                <div class="pos-premium-cart-head">
+                    <p class="pos-premium-overline">Order monitor</p>
+                    <div class="pos-premium-cart-table">
+                        <div>
+                            <span>Table 2</span>
+                            <strong>Main hall</strong>
                         </div>
+                        <strong id="cartOrderNumber" class="pos-premium-cart-ticket">#0016</strong>
                     </div>
+                    <p class="pos-premium-cart-copy">
+                        Restoran uchun bitta asosiy sahifa endi premium POS ko'rinishida chapda buyurtma, o'ngda esa
+                        itemlar vitrinasini bir joyga yig'adi.
+                    </p>
+                </div>
 
-                    <div class="flex flex-wrap items-center gap-3">
-                        <div class="hidden flex-wrap items-center gap-2 lg:flex">
-                            <span class="menu-browser-pill">{{ $stats['menuItems'] }} menu items</span>
-                            <span class="menu-browser-pill">{{ $stats['sections'] }} sections</span>
-                            <span class="menu-browser-pill">{{ $stats['branches'] }} branches</span>
+                <div id="cartList" class="pos-premium-cart-list pos-scroll">
+                    @forelse ($initialCartLines as $line)
+                        <div class="pos-premium-cart-row" data-cart-row="{{ $line['id'] }}">
+                            <div class="min-w-0">
+                                <p class="pos-premium-cart-row-title">{{ $line['name'] }}</p>
+                                <p class="pos-premium-cart-row-meta">
+                                    {{ $line['quantity'] }} x {{ $formatMoney($line['price']) }}
+                                </p>
+                            </div>
+
+                            <div class="pos-premium-cart-stepper">
+                                <button type="button" data-cart-action="decrease" data-item-id="{{ $line['id'] }}">-</button>
+                                <span>{{ $line['quantity'] }}</span>
+                                <button type="button" data-cart-action="increase" data-item-id="{{ $line['id'] }}">+</button>
+                            </div>
+
+                            <strong class="pos-premium-cart-row-total">{{ $formatMoney($line['lineTotal']) }}</strong>
                         </div>
+                    @empty
+                        <div class="pos-premium-cart-empty">
+                            Hozircha cart bo'sh. O'ng tarafdagi kartalardan birini bossangiz buyurtmaga qo'shiladi.
+                        </div>
+                    @endforelse
+                </div>
 
-                        @auth
-                            <a href="{{ route('cabinet') }}" class="menu-browser-login rounded-2xl px-6">Cabinet</a>
-                        @else
-                            <a href="{{ route('login') }}" class="menu-browser-login rounded-2xl px-6">Login</a>
-                        @endauth
+                <div class="pos-premium-cart-summary">
+                    <div class="pos-premium-cart-stat">
+                        <span>Items</span>
+                        <strong id="cartItemCount">{{ $initialItemCount }}</strong>
+                    </div>
+                    <div class="pos-premium-cart-stat">
+                        <span>Discount</span>
+                        <strong id="cartDiscount">0%</strong>
+                    </div>
+                    <div class="pos-premium-cart-stat is-total">
+                        <span>Subtotal</span>
+                        <strong id="cartSubtotal">{{ $formatMoney($initialSubtotal) }}</strong>
                     </div>
                 </div>
 
-                <div class="mt-6 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                    <div class="max-w-2xl">
-                        <p id="menuCue" class="menu-browser-kicker">
-                            {{ $initialCategory['cue'] }}
-                        </p>
-                        <p id="menuSummary" class="menu-browser-lead mt-3">
+                <button type="button" id="cartCheckout" class="pos-premium-checkout">
+                    <span>Checkout</span>
+                    <strong id="cartCheckoutTotal">{{ $formatMoney($initialSubtotal) }}</strong>
+                </button>
+            </aside>
+
+            <div class="pos-premium-main">
+                <header class="pos-premium-topbar">
+                    <div>
+                        <p class="pos-premium-overline">Cafe POS premium</p>
+                        <h1 class="pos-premium-title">{{ config('app.name', 'Restaurant POS') }}</h1>
+                    </div>
+
+                    <div class="pos-premium-top-actions">
+                        <span class="pos-premium-top-pill">{{ $stats['menuItems'] }} items</span>
+                        <span class="pos-premium-top-pill">{{ $stats['sections'] }} sections</span>
+                        <span class="pos-premium-top-pill">{{ $stats['branches'] }} branches</span>
+                        <button type="button" id="newOrderButton" class="pos-premium-top-action is-primary">New order</button>
+                        <button type="button" id="receiptButton" class="pos-premium-top-action">Receipt</button>
+
+                        @auth
+                            <a href="{{ route('cabinet') }}" class="pos-premium-top-action">Cabinet</a>
+                        @else
+                            <a href="{{ route('login') }}" class="pos-premium-top-action">Login</a>
+                        @endauth
+                    </div>
+                </header>
+
+                <div class="pos-premium-focus">
+                    <div class="pos-premium-focus-copy">
+                        <p id="menuCue" class="pos-premium-overline">{{ $initialCategory['cue'] }}</p>
+                        <h2 id="menuTitle" class="pos-premium-focus-title">{{ $initialCategory['name'] }}</h2>
+                        <p id="menuSummary" class="pos-premium-focus-summary">
                             {{ $initialCategory['summary'] }}
                         </p>
                     </div>
 
-                    <nav class="pos-scroll flex gap-2 overflow-x-auto pb-2" id="menuTabs">
+                    <div class="pos-premium-feature">
+                        <p class="pos-premium-feature-label">Selected item</p>
+                        <p id="menuSelectedCategory" class="pos-premium-feature-category">{{ $initialCategory['name'] }}</p>
+                        <h3 id="menuSelectedName" class="pos-premium-feature-name">
+                            {{ $initialItem['name'] ?? 'House selection' }}
+                        </h3>
+                        <p id="menuSelectedDescription" class="pos-premium-feature-copy">
+                            {{ $initialItem['description'] ?: "Shu joyda itemning description, narxi va station ma'lumoti yangilanadi." }}
+                        </p>
+                        <div class="pos-premium-feature-meta">
+                            <span id="menuSelectedStation">{{ $initialItem['station'] ?? 'Kitchen' }}</span>
+                            <span id="menuSelectedSku">{{ $initialItem['sku'] ?? 'N/A' }}</span>
+                            <strong id="menuSelectedPrice">
+                                {{ $initialItem ? $formatMoney($initialItem['price']) : 'No price' }}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pos-premium-toolbar">
+                    <nav id="menuTabs" class="pos-premium-tabs pos-scroll">
                         @foreach ($menuCatalog as $category)
                             <button
                                 type="button"
-                                class="menu-browser-tab {{ $category['slug'] === $initialCategory['slug'] ? 'is-active' : '' }} {{ $category['theme'] }}"
+                                class="pos-premium-tab {{ $category['theme'] }} {{ $category['slug'] === $initialCategory['slug'] ? 'is-active' : '' }}"
                                 data-category="{{ $category['slug'] }}"
                                 aria-pressed="{{ $category['slug'] === $initialCategory['slug'] ? 'true' : 'false' }}"
                             >
@@ -68,228 +202,92 @@
                             </button>
                         @endforeach
                     </nav>
+
+                    <div class="pos-premium-toolbar-actions">
+                        <button type="button" id="surprisePick" class="pos-premium-chip">Surprise pick</button>
+                        <button type="button" id="chefPick" class="pos-premium-chip">Chef special</button>
+                    </div>
                 </div>
-            </header>
 
-            <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-                <div class="min-w-0">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h2 id="menuTitle" class="cafe-display text-4xl text-white sm:text-5xl">
-                                {{ $initialCategory['name'] }}
-                            </h2>
-                            <p class="menu-browser-caption mt-3">
-                                Bo'limni almashtirsangiz, shu joydagi itemlar JavaScript orqali shu sahifada yangilanadi.
-                            </p>
-                        </div>
+                <div id="menuGrid" class="pos-premium-grid"></div>
 
-                        <div class="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.25em]">
-                            <span id="menuCountBadge" class="menu-browser-pill">{{ $initialCategory['count'] }} items</span>
-                            <span id="menuPageBadge" class="menu-browser-pill">Page 1 / {{ $initialPages }}</span>
-                        </div>
-                    </div>
-
-                    <div class="mt-5 flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-                        <div class="menu-browser-modebar" id="menuViewModes">
-                            <button type="button" class="menu-browser-mode is-active" data-view-switch="signature" aria-pressed="true">
-                                <span>Signature mode</span>
-                                <strong>Atmosphere</strong>
-                            </button>
-                            <button type="button" class="menu-browser-mode" data-view-switch="express" aria-pressed="false">
-                                <span>Express mode</span>
-                                <strong>Fast scan</strong>
-                            </button>
-                        </div>
-
-                        <div class="menu-browser-actionbar" id="menuMagicActions">
-                            <button type="button" class="menu-browser-action is-accent" data-magic-action="random">
-                                Surprise me
-                            </button>
-                            <button type="button" class="menu-browser-action" data-magic-action="cheapest">
-                                Best deal
-                            </button>
-                            <button type="button" class="menu-browser-action" data-magic-action="premium">
-                                Chef's pick
-                            </button>
-                        </div>
-                    </div>
-
-                    <p id="menuModeHint" class="menu-browser-caption mt-3">
-                        Signature mode premium preview beradi, Express mode esa itemlarni tezroq topish uchun narx bo'yicha tartiblaydi.
+                <footer id="menuPagination" class="pos-premium-pagination {{ $initialPages <= 1 ? 'is-hidden' : '' }}">
+                    <p id="menuResultsInfo" class="pos-premium-pagination-copy">
+                        Showing {{ $initialVisibleItems->count() }} of {{ $initialItems->count() }} items
                     </p>
 
-                    <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" id="menuGrid">
-                        @foreach ($initialVisibleItems as $item)
-                            <button
-                                type="button"
-                                class="menu-browser-card {{ $loop->first ? 'is-active' : '' }}"
-                                data-item-id="{{ $item['id'] }}"
-                            >
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <p class="menu-browser-card-title">{{ $item['name'] }}</p>
-                                        <p class="menu-browser-card-copy">
-                                            {{ $item['description'] ?: "Tavsif hozircha kiritilmagan." }}
-                                        </p>
-                                    </div>
-
-                                    <span class="menu-browser-station">{{ $item['station'] }}</span>
-                                </div>
-
-                                <div class="mt-5 flex items-center justify-between gap-3">
-                                    <span class="menu-browser-price">{{ number_format($item['price'], 0, '.', ' ') }} so'm</span>
-                                    <span class="menu-browser-sku">{{ $item['sku'] }}</span>
-                                </div>
-                            </button>
-                        @endforeach
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" id="menuPrev" class="pos-premium-page-nav" {{ $initialPages <= 1 ? 'disabled' : '' }}>
+                            Prev
+                        </button>
+                        <div id="menuPager" class="flex flex-wrap items-center gap-2"></div>
+                        <button type="button" id="menuNext" class="pos-premium-page-nav" {{ $initialPages <= 1 ? 'disabled' : '' }}>
+                            Next
+                        </button>
                     </div>
-
-                    <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p id="menuResultsInfo" class="menu-browser-caption">
-                            Showing {{ $initialVisibleItems->count() }} of {{ $initialItems->count() }} items
-                        </p>
-
-                        <div class="flex flex-wrap items-center gap-2">
-                            <button type="button" id="menuPrev" class="menu-browser-nav" {{ $initialPages <= 1 ? 'disabled' : '' }}>
-                                Prev
-                            </button>
-
-                            <div class="flex flex-wrap items-center gap-2" id="menuPager">
-                                @for ($page = 1; $page <= $initialPages; $page++)
-                                    <button
-                                        type="button"
-                                        class="menu-browser-page {{ $page === 1 ? 'is-active' : '' }}"
-                                        data-page="{{ $page }}"
-                                    >
-                                        {{ $page }}
-                                    </button>
-                                @endfor
-                            </div>
-
-                            <button type="button" id="menuNext" class="menu-browser-nav" {{ $initialPages <= 1 ? 'disabled' : '' }}>
-                                Next
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <aside class="menu-browser-aside">
-                    <div class="menu-browser-detail">
-                        <p class="menu-browser-kicker">Selected item</p>
-                        <p id="menuSelectedCategory" class="menu-browser-subtle mt-3">
-                            {{ $initialCategory['name'] }}
-                        </p>
-                        <h3 id="menuSelectedName" class="cafe-display mt-3 text-4xl text-white">
-                            {{ $initialItem['name'] ?? 'Menu preview' }}
-                        </h3>
-                        <p id="menuSelectedDescription" class="menu-browser-caption mt-4">
-                            {{ $initialItem['description'] ?? "Kategoriya tanlanganda shu yerda itemning description, narxi va boshqa kerakli qiymatlar ko'rinadi." }}
-                        </p>
-
-                        <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                            <div class="menu-browser-meta">
-                                <span>Price</span>
-                                <strong id="menuSelectedPrice">
-                                    {{ $initialItem ? number_format($initialItem['price'], 0, '.', ' ') . " so'm" : 'No price' }}
-                                </strong>
-                            </div>
-                            <div class="menu-browser-meta">
-                                <span>Station</span>
-                                <strong id="menuSelectedStation">{{ $initialItem['station'] ?? 'Kitchen' }}</strong>
-                            </div>
-                            <div class="menu-browser-meta">
-                                <span>SKU</span>
-                                <strong id="menuSelectedSku">{{ $initialItem['sku'] ?? 'N/A' }}</strong>
-                            </div>
-                            <div class="menu-browser-meta">
-                                <span>Category</span>
-                                <strong id="menuSelectedTheme">{{ $initialCategory['cue'] }}</strong>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="menu-browser-note">
-                        <p class="menu-browser-kicker">Mood control</p>
-                        <p id="menuLiveTitle" class="menu-browser-note-title mt-3">Signature mode active</p>
-                        <p id="menuLiveDescription" class="menu-browser-caption mt-3">
-                            Premium atmosfera, kengroq preview va tanlangan item uchun boyroq fokus.
-                        </p>
-                        <div class="mt-5 flex flex-wrap gap-2">
-                            <span id="menuLiveBadge" class="menu-browser-chip">Atmosphere</span>
-                            <span id="menuActionBadge" class="menu-browser-chip">Manual pick</span>
-                        </div>
-                        <p id="menuMagicFeedback" class="menu-browser-caption mt-4">
-                            Surprise me random itemni topadi, Best deal eng hamyonbop variantni, Chef's pick esa kuchli signature itemni ko'rsatadi.
-                        </p>
-                    </div>
-                </aside>
+                </footer>
             </div>
 
-            <div id="menuToast" class="menu-browser-toast" aria-live="polite" aria-atomic="true"></div>
+            <div id="posPremiumToast" class="pos-premium-toast" aria-live="polite" aria-atomic="true"></div>
         </section>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const menuCatalog = {{ Illuminate\Support\Js::from($menuCatalog->values()) }};
+            const initialCartSeed = {{ Illuminate\Support\Js::from($initialCartSeed->values()) }};
 
             if (!Array.isArray(menuCatalog) || menuCatalog.length === 0) {
                 return;
             }
 
-            const perPage = 9;
-            const modeMeta = {
-                signature: {
-                    title: 'Signature mode active',
-                    badge: 'Atmosphere',
-                    description: "Premium atmosfera, kengroq preview va tanlangan item uchun boyroq fokus.",
-                    hint: "Signature mode premium preview beradi, kartalar tabiiy tartibda qoladi va tanlov hissi kuchayadi.",
-                },
-                express: {
-                    title: 'Express mode active',
-                    badge: 'Fast scan',
-                    description: "Tez tanlash uchun itemlar narx bo'yicha tartiblanadi va kartalar ixchamroq ishlaydi.",
-                    hint: "Express mode itemlarni hamyonbopidan boshlab ko'rsatadi, user qisqa va tez tanlov qila oladi.",
-                },
-            };
+            const perPage = {{ $perPage }};
             const state = {
                 activeCategory: menuCatalog[0].slug,
+                selectedItemId: menuCatalog[0].items?.[0]?.id ?? null,
                 page: 1,
-                selectedItemId: menuCatalog[0].items[0]?.id ?? null,
-                viewMode: 'signature',
-                lastActionLabel: 'Manual pick',
-                experienceNote: "Surprise me random itemni topadi, Best deal eng hamyonbop variantni, Chef's pick esa kuchli signature itemni ko'rsatadi.",
+                orderNumber: 16,
+                cart: Object.fromEntries(initialCartSeed.map((line) => [String(line.id), Number(line.quantity || 0)])),
             };
 
+            const itemLookup = Object.fromEntries(
+                menuCatalog.flatMap((category) => (category.items ?? []).map((item) => [
+                    String(item.id),
+                    {
+                        ...item,
+                        categorySlug: category.slug,
+                        categoryName: category.name,
+                        theme: category.theme,
+                        cue: category.cue,
+                        summary: category.summary,
+                    },
+                ]))
+            );
+
             const refs = {
-                shell: document.getElementById('menuBrowserShell'),
-                modeButtons: Array.from(document.querySelectorAll('[data-view-switch]')),
-                actionButtons: Array.from(document.querySelectorAll('[data-magic-action]')),
-                tabs: Array.from(document.querySelectorAll('[data-category]')),
-                grid: document.getElementById('menuGrid'),
-                pager: document.getElementById('menuPager'),
-                prev: document.getElementById('menuPrev'),
-                next: document.getElementById('menuNext'),
+                cartList: document.getElementById('cartList'),
+                cartOrderNumber: document.getElementById('cartOrderNumber'),
+                cartItemCount: document.getElementById('cartItemCount'),
+                cartSubtotal: document.getElementById('cartSubtotal'),
+                cartCheckoutTotal: document.getElementById('cartCheckoutTotal'),
+                cartCheckout: document.getElementById('cartCheckout'),
+                title: document.getElementById('menuTitle'),
                 cue: document.getElementById('menuCue'),
                 summary: document.getElementById('menuSummary'),
-                title: document.getElementById('menuTitle'),
-                countBadge: document.getElementById('menuCountBadge'),
-                pageBadge: document.getElementById('menuPageBadge'),
-                resultsInfo: document.getElementById('menuResultsInfo'),
-                modeHint: document.getElementById('menuModeHint'),
                 selectedCategory: document.getElementById('menuSelectedCategory'),
                 selectedName: document.getElementById('menuSelectedName'),
                 selectedDescription: document.getElementById('menuSelectedDescription'),
-                selectedPrice: document.getElementById('menuSelectedPrice'),
                 selectedStation: document.getElementById('menuSelectedStation'),
                 selectedSku: document.getElementById('menuSelectedSku'),
-                selectedTheme: document.getElementById('menuSelectedTheme'),
-                liveTitle: document.getElementById('menuLiveTitle'),
-                liveDescription: document.getElementById('menuLiveDescription'),
-                liveBadge: document.getElementById('menuLiveBadge'),
-                actionBadge: document.getElementById('menuActionBadge'),
-                magicFeedback: document.getElementById('menuMagicFeedback'),
-                toast: document.getElementById('menuToast'),
+                selectedPrice: document.getElementById('menuSelectedPrice'),
+                grid: document.getElementById('menuGrid'),
+                tabs: Array.from(document.querySelectorAll('[data-category]')),
+                pager: document.getElementById('menuPager'),
+                pagination: document.getElementById('menuPagination'),
+                prev: document.getElementById('menuPrev'),
+                next: document.getElementById('menuNext'),
+                resultsInfo: document.getElementById('menuResultsInfo'),
+                toast: document.getElementById('posPremiumToast'),
             };
 
             const formatPrice = (value) => `${new Intl.NumberFormat('ru-RU').format(Math.round(Number(value || 0)))} so'm`;
@@ -299,73 +297,35 @@
                 .replaceAll('>', '&gt;')
                 .replaceAll('"', '&quot;')
                 .replaceAll("'", '&#39;');
+            const getInitials = (value) => {
+                const normalized = String(value ?? '').replace(/[^a-z0-9]/gi, '') || String(value ?? 'HP');
+                return normalized.slice(0, 2).toUpperCase();
+            };
 
             let toastTimer;
+
             const getCategory = () => menuCatalog.find((category) => category.slug === state.activeCategory) ?? menuCatalog[0];
-            const getOrderedItems = (category) => {
-                const items = [...(category?.items ?? [])];
-
-                if (state.viewMode === 'express') {
-                    return items.sort((left, right) => {
-                        const leftPrice = Number(left.price || 0);
-                        const rightPrice = Number(right.price || 0);
-
-                        if (leftPrice !== rightPrice) {
-                            return leftPrice - rightPrice;
-                        }
-
-                        return String(left.name ?? '').localeCompare(String(right.name ?? ''));
-                    });
-                }
-
-                return items;
-            };
-            const getTotalPages = (category) => Math.max(1, Math.ceil(getOrderedItems(category).length / perPage));
+            const getItems = (category) => [...(category.items ?? [])];
+            const getTotalPages = (category) => Math.max(1, Math.ceil(getItems(category).length / perPage));
             const getPageItems = (category) => {
-                const items = getOrderedItems(category);
                 const start = (state.page - 1) * perPage;
-                return items.slice(start, start + perPage);
+                return getItems(category).slice(start, start + perPage);
             };
+            const getSelectedItem = () => itemLookup[String(state.selectedItemId)] ?? getItems(getCategory())[0] ?? null;
+            const getCartEntries = () => Object.entries(state.cart)
+                .map(([id, quantity]) => {
+                    const item = itemLookup[id];
+                    if (!item || quantity <= 0) {
+                        return null;
+                    }
 
-            const syncSelection = (category, pageItems) => {
-                const orderedItems = getOrderedItems(category);
-                const selected = pageItems.find((item) => String(item.id) === String(state.selectedItemId));
-                if (!selected) {
-                    state.selectedItemId = pageItems[0]?.id ?? orderedItems[0]?.id ?? null;
-                }
-                return orderedItems.find((item) => String(item.id) === String(state.selectedItemId)) ?? null;
-            };
-
-            const renderTabs = (category) => {
-                refs.tabs.forEach((tab) => {
-                    const isActive = tab.dataset.category === category.slug;
-                    tab.classList.toggle('is-active', isActive);
-                    tab.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-                });
-            };
-
-            const renderExperience = () => {
-                const activeMode = modeMeta[state.viewMode] ?? modeMeta.signature;
-
-                refs.shell?.setAttribute('data-view-mode', state.viewMode);
-                refs.modeButtons.forEach((button) => {
-                    const isActive = button.dataset.viewSwitch === state.viewMode;
-                    button.classList.toggle('is-active', isActive);
-                    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-                });
-
-                refs.modeHint.textContent = activeMode.hint;
-                refs.liveTitle.textContent = activeMode.title;
-                refs.liveDescription.textContent = activeMode.description;
-                refs.liveBadge.textContent = activeMode.badge;
-                refs.actionBadge.textContent = state.lastActionLabel;
-                refs.magicFeedback.textContent = state.experienceNote;
-            };
-
-            const updateExperience = (label, note) => {
-                state.lastActionLabel = label;
-                state.experienceNote = note;
-            };
+                    return {
+                        ...item,
+                        quantity,
+                        lineTotal: quantity * Number(item.price || 0),
+                    };
+                })
+                .filter(Boolean);
 
             const showToast = (message) => {
                 if (!refs.toast) {
@@ -381,33 +341,50 @@
                 }, 2200);
             };
 
-            const moveSelectionToItem = (categorySlug, itemId) => {
-                state.activeCategory = categorySlug;
+            const addToCart = (itemId, quantity = 1) => {
+                const key = String(itemId);
+                state.cart[key] = Math.max(0, Number(state.cart[key] || 0) + quantity);
 
-                const category = getCategory();
-                const orderedItems = getOrderedItems(category);
-                const itemIndex = orderedItems.findIndex((item) => String(item.id) === String(itemId));
-
-                state.page = itemIndex >= 0 ? Math.floor(itemIndex / perPage) + 1 : 1;
-                state.selectedItemId = itemIndex >= 0 ? orderedItems[itemIndex].id : orderedItems[0]?.id ?? null;
+                if (state.cart[key] === 0) {
+                    delete state.cart[key];
+                }
             };
 
-            const activateItem = (payload, label, note) => {
-                if (!payload?.item || !payload.categorySlug) {
+            const renderTabs = (category) => {
+                refs.tabs.forEach((tab) => {
+                    const isActive = tab.dataset.category === category.slug;
+                    tab.classList.toggle('is-active', isActive);
+                    tab.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                });
+            };
+
+            const renderHeader = (category, selectedItem) => {
+                refs.cue.textContent = category.cue;
+                refs.title.textContent = category.name;
+                refs.summary.textContent = category.summary;
+                refs.selectedCategory.textContent = category.name;
+
+                if (!selectedItem) {
+                    refs.selectedName.textContent = 'House selection';
+                    refs.selectedDescription.textContent = "Shu joyda itemning description, narxi va station ma'lumoti yangilanadi.";
+                    refs.selectedStation.textContent = 'Kitchen';
+                    refs.selectedSku.textContent = 'N/A';
+                    refs.selectedPrice.textContent = 'No price';
                     return;
                 }
 
-                updateExperience(label, note);
-                moveSelectionToItem(payload.categorySlug, payload.item.id);
-                render();
-                showToast(`${label}: ${payload.item.name}`);
+                refs.selectedName.textContent = selectedItem.name;
+                refs.selectedDescription.textContent = selectedItem.description || "Chef tavsiyasi bilan premium taqdimot.";
+                refs.selectedStation.textContent = selectedItem.station || 'Kitchen';
+                refs.selectedSku.textContent = selectedItem.sku || 'N/A';
+                refs.selectedPrice.textContent = formatPrice(selectedItem.price);
             };
 
             const renderGrid = (category, pageItems) => {
                 if (!pageItems.length) {
                     refs.grid.innerHTML = `
-                        <div class="menu-browser-empty sm:col-span-2 xl:col-span-3">
-                            Hozircha bu bo'lim uchun itemlar mavjud emas.
+                        <div class="pos-premium-empty">
+                            Bu bo'limda hozircha item yo'q.
                         </div>
                     `;
                     return;
@@ -415,30 +392,44 @@
 
                 refs.grid.innerHTML = pageItems.map((item) => {
                     const isActive = String(item.id) === String(state.selectedItemId);
+                    const quantity = Number(state.cart[String(item.id)] || 0);
+                    const safeDescription = item.description || 'Chef tavsiyasi bilan premium taqdimot.';
+
                     return `
-                        <button type="button" class="menu-browser-card ${isActive ? 'is-active' : ''}" data-item-id="${escapeHtml(item.id)}">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="menu-browser-card-title">${escapeHtml(item.name)}</p>
-                                    <p class="menu-browser-card-copy">${escapeHtml(item.description || "Tavsif hozircha kiritilmagan.")}</p>
-                                </div>
-                                <span class="menu-browser-station">${escapeHtml(item.station || 'Kitchen')}</span>
+                        <button type="button" class="pos-premium-card ${escapeHtml(category.theme)} ${isActive ? 'is-active' : ''}" data-item-id="${escapeHtml(item.id)}">
+                            <span class="pos-premium-card-price">${formatPrice(item.price)}</span>
+                            ${quantity > 0 ? `<span class="pos-premium-card-qty">${quantity}</span>` : ''}
+                            <div class="pos-premium-card-visual">
+                                <span class="pos-premium-card-initials">${escapeHtml(getInitials(item.name))}</span>
+                                <span class="pos-premium-card-sheen"></span>
                             </div>
-                            <div class="mt-5 flex items-center justify-between gap-3">
-                                <span class="menu-browser-price">${formatPrice(item.price)}</span>
-                                <span class="menu-browser-sku">${escapeHtml(item.sku || 'N/A')}</span>
+                            <div class="pos-premium-card-body">
+                                <p class="pos-premium-card-title">${escapeHtml(item.name)}</p>
+                                <p class="pos-premium-card-copy">${escapeHtml(safeDescription)}</p>
+                                <div class="pos-premium-card-meta">
+                                    <span class="pos-premium-card-station">${escapeHtml(item.station || 'Kitchen')}</span>
+                                    <span class="pos-premium-card-add">Tap to add</span>
+                                </div>
                             </div>
                         </button>
                     `;
                 }).join('');
             };
 
-            const renderPager = (category) => {
+            const renderPager = (category, pageItems) => {
                 const totalPages = getTotalPages(category);
+                const start = pageItems.length ? ((state.page - 1) * perPage) + 1 : 0;
+                const end = pageItems.length ? start + pageItems.length - 1 : 0;
+
+                refs.pagination.classList.toggle('is-hidden', totalPages <= 1);
+                refs.resultsInfo.textContent = pageItems.length
+                    ? `Showing ${start}-${end} of ${getItems(category).length} items`
+                    : 'No items in this section';
+
                 refs.pager.innerHTML = Array.from({ length: totalPages }, (_, index) => {
                     const page = index + 1;
                     return `
-                        <button type="button" class="menu-browser-page ${page === state.page ? 'is-active' : ''}" data-page="${page}">
+                        <button type="button" class="pos-premium-page ${page === state.page ? 'is-active' : ''}" data-page="${page}">
                             ${page}
                         </button>
                     `;
@@ -448,81 +439,61 @@
                 refs.next.disabled = state.page >= totalPages;
             };
 
-            const renderSelected = (category, selectedItem) => {
-                refs.selectedCategory.textContent = category.name;
-                refs.selectedTheme.textContent = category.cue;
+            const renderCart = () => {
+                const cartEntries = getCartEntries();
+                const itemCount = cartEntries.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+                const subtotal = cartEntries.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
 
-                if (!selectedItem) {
-                    refs.selectedName.textContent = 'Menu preview';
-                    refs.selectedDescription.textContent = "Kategoriya tanlanganda shu yerda itemning description, narxi va boshqa kerakli qiymatlar ko'rinadi.";
-                    refs.selectedPrice.textContent = 'No price';
-                    refs.selectedStation.textContent = 'Kitchen';
-                    refs.selectedSku.textContent = 'N/A';
+                refs.cartItemCount.textContent = String(itemCount);
+                refs.cartSubtotal.textContent = formatPrice(subtotal);
+                refs.cartCheckoutTotal.textContent = formatPrice(subtotal);
+                refs.cartOrderNumber.textContent = `#${String(state.orderNumber).padStart(4, '0')}`;
+
+                if (!cartEntries.length) {
+                    refs.cartList.innerHTML = `
+                        <div class="pos-premium-cart-empty">
+                            Hozircha cart bo'sh. O'ng tarafdagi kartalardan birini bossangiz buyurtmaga qo'shiladi.
+                        </div>
+                    `;
                     return;
                 }
 
-                refs.selectedName.textContent = selectedItem.name;
-                refs.selectedDescription.textContent = selectedItem.description || "Tavsif hozircha kiritilmagan.";
-                refs.selectedPrice.textContent = formatPrice(selectedItem.price);
-                refs.selectedStation.textContent = selectedItem.station || 'Kitchen';
-                refs.selectedSku.textContent = selectedItem.sku || 'N/A';
-            };
-
-            const renderMeta = (category, pageItems) => {
-                const totalPages = getTotalPages(category);
-                const start = pageItems.length ? ((state.page - 1) * perPage) + 1 : 0;
-                const end = pageItems.length ? start + pageItems.length - 1 : 0;
-                const orderedItems = getOrderedItems(category);
-
-                refs.cue.textContent = category.cue;
-                refs.summary.textContent = category.summary;
-                refs.title.textContent = category.name;
-                refs.countBadge.textContent = `${category.count} items`;
-                refs.pageBadge.textContent = `Page ${state.page} / ${totalPages}`;
-                refs.resultsInfo.textContent = pageItems.length
-                    ? `Showing ${start}-${end} of ${orderedItems.length} items`
-                    : 'No items in this section';
+                refs.cartList.innerHTML = cartEntries.map((item) => `
+                    <div class="pos-premium-cart-row" data-cart-row="${escapeHtml(item.id)}">
+                        <div class="min-w-0">
+                            <p class="pos-premium-cart-row-title">${escapeHtml(item.name)}</p>
+                            <p class="pos-premium-cart-row-meta">${item.quantity} x ${formatPrice(item.price)}</p>
+                        </div>
+                        <div class="pos-premium-cart-stepper">
+                            <button type="button" data-cart-action="decrease" data-item-id="${escapeHtml(item.id)}">-</button>
+                            <span>${item.quantity}</span>
+                            <button type="button" data-cart-action="increase" data-item-id="${escapeHtml(item.id)}">+</button>
+                        </div>
+                        <strong class="pos-premium-cart-row-total">${formatPrice(item.lineTotal)}</strong>
+                    </div>
+                `).join('');
             };
 
             const render = () => {
                 const category = getCategory();
                 state.page = Math.min(Math.max(1, state.page), getTotalPages(category));
+
+                if (!itemLookup[String(state.selectedItemId)] || itemLookup[String(state.selectedItemId)]?.categorySlug !== category.slug) {
+                    state.selectedItemId = getItems(category)[0]?.id ?? null;
+                }
+
                 const pageItems = getPageItems(category);
-                const selectedItem = syncSelection(category, pageItems);
+
+                if (!pageItems.some((item) => String(item.id) === String(state.selectedItemId))) {
+                    state.selectedItemId = pageItems[0]?.id ?? getItems(category)[0]?.id ?? null;
+                }
 
                 renderTabs(category);
-                renderExperience();
-                renderMeta(category, pageItems);
+                renderHeader(category, getSelectedItem());
                 renderGrid(category, pageItems);
-                renderPager(category);
-                renderSelected(category, selectedItem);
+                renderPager(category, pageItems);
+                renderCart();
             };
-
-            document.getElementById('menuViewModes')?.addEventListener('click', (event) => {
-                const button = event.target.closest('[data-view-switch]');
-                if (!button) {
-                    return;
-                }
-
-                const nextMode = button.dataset.viewSwitch;
-                if (!nextMode || nextMode === state.viewMode) {
-                    return;
-                }
-
-                state.viewMode = nextMode;
-                const category = getCategory();
-                const orderedItems = getOrderedItems(category);
-                state.page = 1;
-                state.selectedItemId = orderedItems[0]?.id ?? null;
-                updateExperience(
-                    'Mode switch',
-                    nextMode === 'express'
-                        ? "Express mode yoqildi: itemlar narx bo'yicha tartiblandi va tezroq scan qilish uchun tayyor."
-                        : "Signature mode yoqildi: premium preview va tabiiy tartib qaytdi."
-                );
-                render();
-                showToast(nextMode === 'express' ? 'Express mode on' : 'Signature mode on');
-            });
 
             document.getElementById('menuTabs')?.addEventListener('click', (event) => {
                 const button = event.target.closest('[data-category]');
@@ -537,8 +508,7 @@
 
                 state.activeCategory = nextCategory;
                 state.page = 1;
-                state.selectedItemId = getOrderedItems(getCategory())[0]?.id ?? null;
-                updateExperience('Section switch', "Bo'lim almashtirildi, shu panelning ichida yangi itemlar ko'rsatildi.");
+                state.selectedItemId = getItems(getCategory())[0]?.id ?? null;
                 render();
             });
 
@@ -548,8 +518,31 @@
                     return;
                 }
 
-                state.selectedItemId = card.dataset.itemId;
-                updateExperience('Manual pick', "Tanlangan item detail panelda darhol yangilandi.");
+                const itemId = card.dataset.itemId;
+                const item = itemLookup[String(itemId)];
+                if (!item) {
+                    return;
+                }
+
+                state.selectedItemId = item.id;
+                addToCart(item.id, 1);
+                render();
+                showToast(`${item.name} buyurtmaga qo'shildi`);
+            });
+
+            refs.cartList?.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-cart-action]');
+                if (!button) {
+                    return;
+                }
+
+                const itemId = button.dataset.itemId;
+                const action = button.dataset.cartAction;
+                if (!itemId || !action) {
+                    return;
+                }
+
+                addToCart(itemId, action === 'increase' ? 1 : -1);
                 render();
             });
 
@@ -561,8 +554,7 @@
 
                 state.page = Number(button.dataset.page || 1);
                 const category = getCategory();
-                state.selectedItemId = getPageItems(category)[0]?.id ?? getOrderedItems(category)[0]?.id ?? null;
-                updateExperience('Page move', "Pagination orqali keyingi itemlar ham shu blokning o'zida ochildi.");
+                state.selectedItemId = getPageItems(category)[0]?.id ?? getItems(category)[0]?.id ?? null;
                 render();
             });
 
@@ -573,8 +565,7 @@
 
                 state.page -= 1;
                 const category = getCategory();
-                state.selectedItemId = getPageItems(category)[0]?.id ?? getOrderedItems(category)[0]?.id ?? null;
-                updateExperience('Page move', "Oldingi page ochildi va birinchi item avtomatik fokusga tushdi.");
+                state.selectedItemId = getPageItems(category)[0]?.id ?? getItems(category)[0]?.id ?? null;
                 render();
             });
 
@@ -585,83 +576,65 @@
 
                 state.page += 1;
                 const category = getCategory();
-                state.selectedItemId = getPageItems(category)[0]?.id ?? getOrderedItems(category)[0]?.id ?? null;
-                updateExperience('Page move', "Keyingi page ochildi va user oqimdan chiqmaydi.");
+                state.selectedItemId = getPageItems(category)[0]?.id ?? getItems(category)[0]?.id ?? null;
                 render();
             });
 
-            document.getElementById('menuMagicActions')?.addEventListener('click', (event) => {
-                const button = event.target.closest('[data-magic-action]');
-                if (!button) {
-                    return;
-                }
-
-                const action = button.dataset.magicAction;
-                const currentCategory = getCategory();
-                const currentItems = getOrderedItems(currentCategory);
-
-                if (action === 'random') {
-                    const allItems = menuCatalog.flatMap((category) => (category.items ?? []).map((item) => ({
-                        categorySlug: category.slug,
-                        categoryName: category.name,
-                        item,
-                    })));
-
-                    if (!allItems.length) {
-                        return;
-                    }
-
-                    const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
-                    activateItem(
-                        randomItem,
-                        'Surprise me',
-                        `${randomItem.categoryName} bo'limidan ${randomItem.item.name} random tanlov sifatida chiqarildi.`
-                    );
-                    return;
-                }
-
-                if (!currentItems.length) {
-                    return;
-                }
-
-                if (action === 'cheapest') {
-                    const cheapestItem = currentItems.reduce((best, item) => {
-                        if (!best) {
-                            return item;
-                        }
-
-                        return Number(item.price || 0) < Number(best.price || 0) ? item : best;
-                    }, null);
-
-                    activateItem(
-                        { categorySlug: currentCategory.slug, item: cheapestItem },
-                        'Best deal',
-                        `${currentCategory.name} bo'limidagi eng hamyonbop variant ${cheapestItem?.name ?? 'item'} sifatida topildi.`
-                    );
-                    return;
-                }
-
-                if (action === 'premium') {
-                    const premiumItem = currentItems.reduce((best, item) => {
-                        if (!best) {
-                            return item;
-                        }
-
-                        return Number(item.price || 0) > Number(best.price || 0) ? item : best;
-                    }, null);
-
-                    activateItem(
-                        { categorySlug: currentCategory.slug, item: premiumItem },
-                        "Chef's pick",
-                        `${currentCategory.name} bo'limida ko'proq premium taassurot beradigan ${premiumItem?.name ?? 'item'} ajratib ko'rsatildi.`
-                    );
-                }
+            document.getElementById('newOrderButton')?.addEventListener('click', () => {
+                state.cart = {};
+                state.orderNumber += 1;
+                render();
+                showToast('Yangi order ochildi');
             });
 
-            refs.actionButtons.forEach((button) => {
-                button.addEventListener('mouseleave', () => {
-                    button.blur();
-                });
+            document.getElementById('receiptButton')?.addEventListener('click', () => {
+                const cartEntries = getCartEntries();
+                const subtotal = cartEntries.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
+                showToast(`Receipt preview: ${cartEntries.length} item, ${formatPrice(subtotal)}`);
+            });
+
+            document.getElementById('surprisePick')?.addEventListener('click', () => {
+                const category = getCategory();
+                const items = getItems(category);
+                if (!items.length) {
+                    return;
+                }
+
+                const item = items[Math.floor(Math.random() * items.length)];
+                state.selectedItemId = item.id;
+                addToCart(item.id, 1);
+                render();
+                showToast(`Surprise pick: ${item.name}`);
+            });
+
+            document.getElementById('chefPick')?.addEventListener('click', () => {
+                const category = getCategory();
+                const items = getItems(category);
+                if (!items.length) {
+                    return;
+                }
+
+                const chefItem = items.reduce((best, item) => {
+                    if (!best) {
+                        return item;
+                    }
+
+                    return Number(item.price || 0) > Number(best.price || 0) ? item : best;
+                }, null);
+
+                if (!chefItem) {
+                    return;
+                }
+
+                state.selectedItemId = chefItem.id;
+                addToCart(chefItem.id, 1);
+                render();
+                showToast(`Chef special: ${chefItem.name}`);
+            });
+
+            refs.cartCheckout?.addEventListener('click', () => {
+                const subtotal = getCartEntries().reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
+                showToast(`Checkout ready: ${formatPrice(subtotal)}`);
             });
 
             render();

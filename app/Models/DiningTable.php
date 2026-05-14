@@ -15,6 +15,9 @@ class DiningTable extends Model
         'branch_id',
         'name',
         'seats',
+        'status',
+        'current_order_id',
+        'status_updated_at',
         'is_active',
     ];
 
@@ -22,6 +25,7 @@ class DiningTable extends Model
     {
         return [
             'is_active' => 'boolean',
+            'status_updated_at' => 'datetime',
         ];
     }
 
@@ -33,5 +37,15 @@ class DiningTable extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class, 'dining_table_id');
+    }
+
+    public function currentOrder(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'current_order_id');
+    }
+
+    public function statusLabel(): string
+    {
+        return config("pos.table_statuses.{$this->status}", $this->status);
     }
 }

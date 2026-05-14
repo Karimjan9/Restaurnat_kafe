@@ -19,6 +19,8 @@ class Order extends Model
         'user_id',
         'waiter_user_id',
         'closed_by_user_id',
+        'voided_by_user_id',
+        'merged_into_order_id',
         'order_type',
         'status',
         'customer_name',
@@ -26,20 +28,25 @@ class Order extends Model
         'delivery_address',
         'notes',
         'subtotal',
+        'discount_total',
         'total',
         'placed_at',
         'paid_at',
         'closed_at',
+        'voided_at',
+        'void_reason',
     ];
 
     protected function casts(): array
     {
         return [
             'subtotal' => 'decimal:2',
+            'discount_total' => 'decimal:2',
             'total' => 'decimal:2',
             'placed_at' => 'datetime',
             'paid_at' => 'datetime',
             'closed_at' => 'datetime',
+            'voided_at' => 'datetime',
         ];
     }
 
@@ -68,6 +75,16 @@ class Order extends Model
         return $this->belongsTo(User::class, 'closed_by_user_id');
     }
 
+    public function voidedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'voided_by_user_id');
+    }
+
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'merged_into_order_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
@@ -83,6 +100,11 @@ class Order extends Model
         return $this->hasMany(OrderSplit::class)->orderBy('split_number');
     }
 
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(OrderRefund::class);
+    }
+
     public static function activeStatuses(): array
     {
         return ['open', 'in_service', 'ready', 'served'];
@@ -96,6 +118,21 @@ class Order extends Model
     public static function financialStatuses(): array
     {
         return ['paid', 'closed'];
+    }
+
+    public static function terminalExceptionStatuses(): array
+    {
+        return ['voided', 'merged'];
+    }
+
+    public function refundedAmount(): float
+    {
+        return (float) $this->refunds()->sum('amount');
+    }
+
+    public function netPaidAmount(): float
+    {
+        return max(0, $this->splitBillPaidAmount() - $this->refundedAmount());
     }
 
     public function hasSplitBill(): bool

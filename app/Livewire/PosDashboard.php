@@ -6,12 +6,15 @@ use App\Events\OperationsUpdated;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Models\DiningTable;
+use App\Models\ModifierOption;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -50,8 +53,17 @@ class PosDashboard extends Component
 
     public string $notes = '';
 
-    /** @var array<int, int> */
+    /** @var array<string, array{product_id: int, quantity: int, modifier_option_ids: array<int>, note: string}> */
     public array $cart = [];
+
+    public ?int $configuringProductId = null;
+
+    /** @var array<int, array<int>> */
+    public array $configuredModifierOptions = [];
+
+    public string $configuredItemNote = '';
+
+    public int $configuredQuantity = 1;
 
     public function mount(): void
     {
@@ -74,7 +86,120 @@ class PosDashboard extends Component
 
     public function addProduct(int $productId): void
     {
-        $this->cart[$productId] = ($this->cart[$productId] ?? 0) + 1;
+        $product = Product::query()
+            ->with(['activeModifierGroups.activeOptions'])
+            ->whereKey($productId)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $product) {
+            return;
+        }
+
+        $this->addCartLine($product->id, $this->defaultModifierOptionIds($product), '', 1);
+    }
+
+    public function configureProduct(int $productId): void
+    {
+        $product = Product::query()
+            ->with(['activeModifierGroups.activeOptions'])
+            ->whereKey($productId)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $product) {
+            return;
+        }
+
+        if ($product->activeModifierGroups->isEmpty()) {
+            $this->addProduct($productId);
+
+            return;
+        }
+
+        $this->configuringProductId = $product->id;
+        $this->configuredModifierOptions = $this->defaultModifierSelections($product);
+        $this->configuredItemNote = '';
+        $this->configuredQuantity = 1;
+        $this->resetErrorBag('configuredModifierOptions');
+    }
+
+    public function cancelProductConfiguration(): void
+    {
+        $this->configuringProductId = null;
+        $this->configuredModifierOptions = [];
+        $this->configuredItemNote = '';
+        $this->configuredQuantity = 1;
+        $this->resetErrorBag('configuredModifierOptions');
+    }
+
+    public function toggleModifierOption(int $groupId, int $optionId): void
+    {
+        $product = $this->configuringProduct();
+
+        if (! $product) {
+            return;
+        }
+
+        $group = $product->activeModifierGroups->firstWhere('id', $groupId);
+
+        if (! $group || ! $group->activeOptions->contains('id', $optionId)) {
+            return;
+        }
+
+        if (! $group->isMultiple()) {
+            $this->configuredModifierOptions[$groupId] = [$optionId];
+            $this->resetErrorBag('configuredModifierOptions');
+
+            return;
+        }
+
+        $selected = collect($this->configuredModifierOptions[$groupId] ?? [])->map(fn ($id) => (int) $id)->values();
+
+        if ($selected->contains($optionId)) {
+            $selected = $selected->reject(fn (int $id) => $id === $optionId)->values();
+        } else {
+            $max = $group->max_selected ?: 99;
+
+            if ($selected->count() >= $max) {
+                $this->addError('configuredModifierOptions', "{$group->name} uchun maksimum {$max} ta option tanlanadi.");
+
+                return;
+            }
+
+            $selected->push($optionId);
+        }
+
+        $this->configuredModifierOptions[$groupId] = $selected->values()->all();
+        $this->resetErrorBag('configuredModifierOptions');
+    }
+
+    public function addConfiguredProduct(): void
+    {
+        $product = $this->configuringProduct();
+
+        if (! $product) {
+            return;
+        }
+
+        $validationError = $this->modifierSelectionError($product, $this->configuredModifierOptions);
+
+        if ($validationError) {
+            $this->addError('configuredModifierOptions', $validationError);
+
+            return;
+        }
+
+        $optionIds = $this->selectedModifierOptionIds($product, $this->configuredModifierOptions);
+
+        $this->addCartLine(
+            $product->id,
+            $optionIds,
+            trim($this->configuredItemNote),
+            max(1, $this->configuredQuantity)
+        );
+
+        $this->cancelProductConfiguration();
     }
 
     public function incrementQuantity(int $productId): void
@@ -84,20 +209,49 @@ class PosDashboard extends Component
 
     public function decrementQuantity(int $productId): void
     {
-        if (! isset($this->cart[$productId])) {
+        $lineKey = $this->firstCartLineKeyForProduct($productId);
+
+        if (! $lineKey) {
             return;
         }
 
-        $this->cart[$productId]--;
+        $this->decrementLineQuantity($lineKey);
+    }
 
-        if ($this->cart[$productId] <= 0) {
-            unset($this->cart[$productId]);
+    public function incrementLineQuantity(string $lineKey): void
+    {
+        if (! isset($this->cart[$lineKey])) {
+            return;
+        }
+
+        $this->cart[$lineKey]['quantity']++;
+    }
+
+    public function decrementLineQuantity(string $lineKey): void
+    {
+        if (! isset($this->cart[$lineKey])) {
+            return;
+        }
+
+        $this->cart[$lineKey]['quantity']--;
+
+        if ($this->cart[$lineKey]['quantity'] <= 0) {
+            unset($this->cart[$lineKey]);
         }
     }
 
     public function removeProduct(int $productId): void
     {
-        unset($this->cart[$productId]);
+        foreach (array_keys($this->cart) as $lineKey) {
+            if (($this->cart[$lineKey]['product_id'] ?? null) === $productId) {
+                unset($this->cart[$lineKey]);
+            }
+        }
+    }
+
+    public function removeCartLine(string $lineKey): void
+    {
+        unset($this->cart[$lineKey]);
     }
 
     public function selectServiceOrder(int $orderId): void
@@ -213,6 +367,7 @@ class PosDashboard extends Component
                 'delivery_address' => $validated['deliveryAddress'] ?: null,
                 'notes' => $validated['notes'] ?: null,
                 'subtotal' => $subtotal,
+                'discount_total' => 0,
                 'total' => $subtotal,
                 'placed_at' => $now,
                 'paid_at' => $isServiceOrder ? null : $now,
@@ -220,26 +375,47 @@ class PosDashboard extends Component
             ]);
 
             foreach ($cartItems as $item) {
-                $order->items()->create([
+                $orderItem = $order->items()->create([
                     'product_id' => $item['id'],
                     'product_name' => $item['name'],
                     'station' => $item['station'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['price'],
                     'line_total' => $item['line_total'],
+                    'discount_total' => 0,
+                    'cost_total' => $item['cost_total'],
+                    'item_note' => $item['note'] ?: null,
                     'preparation_status' => $isServiceOrder ? 'queued' : 'served',
                     'sent_to_station_at' => $now,
                     'started_preparing_at' => $isServiceOrder ? null : $now,
                     'ready_at' => $isServiceOrder ? null : $now,
                     'served_at' => $isServiceOrder ? null : $now,
                 ]);
+
+                foreach ($item['modifiers'] as $modifier) {
+                    $orderItem->modifiers()->create([
+                        'modifier_group_id' => $modifier['group_id'],
+                        'modifier_option_id' => $modifier['option_id'],
+                        'group_name' => $modifier['group_name'],
+                        'option_name' => $modifier['option_name'],
+                        'price_delta' => $modifier['price_delta'],
+                        'cost_delta' => $modifier['cost_delta'],
+                        'quantity' => $item['quantity'],
+                    ]);
+                }
             }
 
             if ($isServiceOrder) {
                 $order->refreshPreparationStatus();
+                DiningTable::whereKey($order->dining_table_id)->update([
+                    'status' => 'occupied',
+                    'current_order_id' => $order->id,
+                    'status_updated_at' => $now,
+                ]);
             } else {
                 $order->payments()->create([
                     'user_id' => auth()->id(),
+                    'shift_id' => Shift::currentFor(auth()->id(), $order->branch_id)?->id,
                     'method' => $validated['paymentMethod'],
                     'amount' => $subtotal,
                     'paid_at' => $now,
@@ -319,6 +495,7 @@ class PosDashboard extends Component
                 $order->splits()->create([
                     'split_number' => $index + 1,
                     'label' => 'Guest '.($index + 1),
+                    'split_type' => 'equal',
                     'amount' => $amount,
                     'status' => 'draft',
                 ]);
@@ -358,6 +535,100 @@ class PosDashboard extends Component
             meta: ['split_count' => $validated['splitCount']],
         );
         session()->flash('status', "Equal split yaratildi: {$validated['splitCount']} qism.");
+    }
+
+    public function createItemSplits(): void
+    {
+        $validated = $this->validate([
+            'selectedServiceOrderId' => ['required', 'integer'],
+        ], [
+            'selectedServiceOrderId.required' => 'Avval split qilinadigan orderni tanlang.',
+        ]);
+
+        $result = DB::transaction(function () use ($validated) {
+            $order = $this->settlementOrdersQuery()
+                ->whereKey($validated['selectedServiceOrderId'])
+                ->with(['items', 'splits', 'payments'])
+                ->lockForUpdate()
+                ->first();
+
+            if (! $order) {
+                return ['state' => 'missing'];
+            }
+
+            if ($order->status !== 'served') {
+                return ['state' => 'blocked'];
+            }
+
+            if ($order->payments->isNotEmpty()) {
+                return ['state' => 'payments_exist'];
+            }
+
+            $items = $order->items->values();
+
+            if ($items->isEmpty()) {
+                return ['state' => 'empty'];
+            }
+
+            $order->splits()->delete();
+            $amounts = $this->distributeItemSplitAmounts($items, (float) $order->total);
+
+            foreach ($items as $index => $item) {
+                $split = $order->splits()->create([
+                    'split_number' => $index + 1,
+                    'label' => $item->product_name,
+                    'split_type' => 'item',
+                    'amount' => $amounts[$index],
+                    'status' => 'draft',
+                ]);
+
+                $split->splitItems()->create([
+                    'order_item_id' => $item->id,
+                    'quantity' => $item->quantity,
+                    'amount' => $amounts[$index],
+                ]);
+            }
+
+            return [
+                'state' => 'created',
+                'order' => $order->fresh(['splits.splitItems']),
+            ];
+        });
+
+        if ($result['state'] === 'missing') {
+            $this->addError('selectedServiceOrderId', "Tanlangan order topilmadi.");
+
+            return;
+        }
+
+        if ($result['state'] === 'blocked') {
+            $this->addError('selectedServiceOrderId', "Item split faqat to'liq served bo'lgan orderda ochiladi.");
+
+            return;
+        }
+
+        if ($result['state'] === 'payments_exist') {
+            $this->addError('selectedServiceOrderId', "Orderda payment bor. Item splitni endi qayta yaratib bo'lmaydi.");
+
+            return;
+        }
+
+        if ($result['state'] === 'empty') {
+            $this->addError('selectedServiceOrderId', "Split qilinadigan item topilmadi.");
+
+            return;
+        }
+
+        $this->selectedServiceOrderId = $result['order']->id;
+        $this->selectedSplitId = $result['order']->splits->first()?->id;
+        $this->resetErrorBag(['selectedServiceOrderId', 'selectedSplitId']);
+        OperationsUpdated::dispatch(
+            type: 'pos.item_split.created',
+            branchId: $result['order']->branch_id,
+            orderId: $result['order']->id,
+            meta: ['split_count' => $result['order']->splits->count()],
+        );
+        session()->flash('status', 'Item-level split yaratildi.');
     }
 
     public function paySelectedSplit()
@@ -403,6 +674,7 @@ class PosDashboard extends Component
 
             $order->payments()->create([
                 'user_id' => auth()->id(),
+                'shift_id' => Shift::currentFor(auth()->id(), $order->branch_id)?->id,
                 'order_split_id' => $split->id,
                 'method' => $validated['servicePaymentMethod'],
                 'amount' => $split->amount,
@@ -424,6 +696,12 @@ class PosDashboard extends Component
                     'user_id' => auth()->id(),
                     'status' => 'paid',
                     'paid_at' => $paidAt,
+                ]);
+
+                DiningTable::whereKey($order->dining_table_id)->update([
+                    'status' => 'payment_due',
+                    'current_order_id' => $order->id,
+                    'status_updated_at' => $paidAt,
                 ]);
             }
 
@@ -512,6 +790,7 @@ class PosDashboard extends Component
 
             $order->payments()->create([
                 'user_id' => auth()->id(),
+                'shift_id' => Shift::currentFor(auth()->id(), $order->branch_id)?->id,
                 'method' => $validated['servicePaymentMethod'],
                 'amount' => $order->total,
                 'paid_at' => $paidAt,
@@ -521,6 +800,12 @@ class PosDashboard extends Component
                 'user_id' => auth()->id(),
                 'status' => 'paid',
                 'paid_at' => $paidAt,
+            ]);
+
+            DiningTable::whereKey($order->dining_table_id)->update([
+                'status' => 'payment_due',
+                'current_order_id' => $order->id,
+                'status_updated_at' => $paidAt,
             ]);
 
             return [
@@ -585,6 +870,12 @@ class PosDashboard extends Component
                 'status' => 'closed',
                 'closed_by_user_id' => auth()->id(),
                 'closed_at' => now(),
+            ]);
+
+            DiningTable::whereKey($order->dining_table_id)->update([
+                'status' => 'cleaning',
+                'current_order_id' => null,
+                'status_updated_at' => now(),
             ]);
 
             return [
@@ -664,41 +955,247 @@ class PosDashboard extends Component
         }
 
         return $this->settlementOrdersQuery()
-            ->with(['diningTable', 'items', 'splits', 'payments', 'waiter', 'cashier'])
+            ->with(['diningTable', 'items.modifiers', 'splits', 'payments', 'waiter', 'cashier'])
             ->find($this->selectedServiceOrderId);
     }
 
     protected function cartItems(): Collection
     {
+        $cartLines = $this->normalizedCartLines();
+        $productIds = $cartLines->pluck('product_id')->unique()->values()->all();
+        $optionIds = $cartLines->pluck('modifier_option_ids')->flatten()->unique()->values()->all();
+
         $products = Product::query()
-            ->with('category')
+            ->with(['category', 'activeModifierGroups.activeOptions'])
             ->where('is_active', true)
-            ->whereIn('id', array_keys($this->cart))
+            ->whereIn('id', $productIds)
             ->get()
             ->keyBy('id');
 
-        return collect($this->cart)
-            ->map(function (int $quantity, int|string $productId) use ($products) {
-                $product = $products->get((int) $productId);
+        $options = ModifierOption::query()
+            ->with('group')
+            ->whereIn('id', $optionIds)
+            ->get()
+            ->keyBy('id');
+
+        return $cartLines
+            ->map(function (array $line) use ($products, $options) {
+                $product = $products->get((int) $line['product_id']);
 
                 if (! $product) {
                     return null;
                 }
 
-                $lineTotal = $quantity * (float) $product->price;
+                $lineOptions = collect($line['modifier_option_ids'])
+                    ->map(fn (int $optionId) => $options->get($optionId))
+                    ->filter()
+                    ->values();
+
+                $modifierPrice = (float) $lineOptions->sum(fn (ModifierOption $option) => (float) $option->price_delta);
+                $modifierCost = (float) $lineOptions->sum(fn (ModifierOption $option) => (float) $option->cost_delta);
+                $unitPrice = (float) $product->price + $modifierPrice;
+                $unitCost = (float) $product->cost_price + $modifierCost;
+                $quantity = (int) $line['quantity'];
+                $lineTotal = $quantity * $unitPrice;
+                $costTotal = $quantity * $unitCost;
+                $modifiers = $lineOptions
+                    ->map(fn (ModifierOption $option) => [
+                        'group_id' => $option->modifier_group_id,
+                        'option_id' => $option->id,
+                        'group_name' => $option->group?->name ?? 'Modifier',
+                        'option_name' => $option->name,
+                        'price_delta' => (float) $option->price_delta,
+                        'cost_delta' => (float) $option->cost_delta,
+                    ])
+                    ->values();
 
                 return [
+                    'key' => $line['key'],
                     'id' => $product->id,
                     'name' => $product->name,
                     'category' => $product->category?->name,
                     'station' => $product->station,
-                    'price' => (float) $product->price,
+                    'base_price' => (float) $product->price,
+                    'price' => $unitPrice,
+                    'cost_price' => (float) $product->cost_price,
                     'quantity' => $quantity,
                     'line_total' => $lineTotal,
+                    'cost_total' => $costTotal,
+                    'note' => $line['note'],
+                    'modifiers' => $modifiers->all(),
+                    'modifier_summary' => $modifiers
+                        ->map(fn (array $modifier) => "{$modifier['group_name']}: {$modifier['option_name']}")
+                        ->implode(', '),
                 ];
             })
             ->filter()
             ->values();
+    }
+
+    protected function addCartLine(int $productId, array $modifierOptionIds = [], string $note = '', int $quantity = 1): void
+    {
+        $modifierOptionIds = collect($modifierOptionIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+        $note = Str::of($note)->trim()->limit(500, '')->toString();
+        $lineKey = $this->cartLineKey($productId, $modifierOptionIds, $note);
+
+        if (! isset($this->cart[$lineKey])) {
+            $this->cart[$lineKey] = [
+                'product_id' => $productId,
+                'quantity' => 0,
+                'modifier_option_ids' => $modifierOptionIds,
+                'note' => $note,
+            ];
+        }
+
+        $this->cart[$lineKey]['quantity'] += max(1, $quantity);
+    }
+
+    protected function normalizedCartLines(): Collection
+    {
+        return collect($this->cart)
+            ->map(function ($line, string|int $key) {
+                if (is_int($line)) {
+                    $line = [
+                        'product_id' => (int) $key,
+                        'quantity' => $line,
+                        'modifier_option_ids' => [],
+                        'note' => '',
+                    ];
+                }
+
+                if (! is_array($line) || ! isset($line['product_id'])) {
+                    return null;
+                }
+
+                return [
+                    'key' => (string) $key,
+                    'product_id' => (int) $line['product_id'],
+                    'quantity' => max(1, (int) ($line['quantity'] ?? 1)),
+                    'modifier_option_ids' => collect($line['modifier_option_ids'] ?? [])
+                        ->map(fn ($id) => (int) $id)
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all(),
+                    'note' => (string) ($line['note'] ?? ''),
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    protected function cartLineKey(int $productId, array $modifierOptionIds, string $note): string
+    {
+        sort($modifierOptionIds);
+
+        return 'line_'.md5($productId.'|'.implode(',', $modifierOptionIds).'|'.$note);
+    }
+
+    protected function firstCartLineKeyForProduct(int $productId): ?string
+    {
+        foreach ($this->cart as $lineKey => $line) {
+            if (is_array($line) && (int) ($line['product_id'] ?? 0) === $productId) {
+                return (string) $lineKey;
+            }
+
+            if (is_int($line) && (int) $lineKey === $productId) {
+                return (string) $lineKey;
+            }
+        }
+
+        return null;
+    }
+
+    protected function configuringProduct(): ?Product
+    {
+        if (! $this->configuringProductId) {
+            return null;
+        }
+
+        return Product::query()
+            ->with(['activeModifierGroups.activeOptions'])
+            ->whereKey($this->configuringProductId)
+            ->where('is_active', true)
+            ->first();
+    }
+
+    protected function defaultModifierSelections(Product $product): array
+    {
+        return $product->activeModifierGroups
+            ->mapWithKeys(function ($group) {
+                $defaultOptions = $group->activeOptions->where('is_default', true);
+
+                if ($defaultOptions->isEmpty() && $group->is_required) {
+                    $defaultOptions = $group->activeOptions->take(max(1, $group->min_selected));
+                }
+
+                if (! $group->isMultiple()) {
+                    $defaultOptions = $defaultOptions->take(1);
+                }
+
+                return [$group->id => $defaultOptions->pluck('id')->values()->all()];
+            })
+            ->all();
+    }
+
+    protected function defaultModifierOptionIds(Product $product): array
+    {
+        return collect($this->defaultModifierSelections($product))
+            ->flatten()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function selectedModifierOptionIds(Product $product, array $selections): array
+    {
+        return $product->activeModifierGroups
+            ->flatMap(function ($group) use ($selections) {
+                $allowedOptionIds = $group->activeOptions
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id);
+
+                return collect($selections[$group->id] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn (int $id) => $allowedOptionIds->contains($id))
+                    ->unique()
+                    ->values();
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function modifierSelectionError(Product $product, array $selections): ?string
+    {
+        foreach ($product->activeModifierGroups as $group) {
+            $selected = collect($selections[$group->id] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn (int $id) => $group->activeOptions->contains('id', $id))
+                ->unique()
+                ->values();
+
+            if ($selected->count() < $group->min_selected) {
+                return "{$group->name} uchun kamida {$group->min_selected} ta option tanlang.";
+            }
+
+            if ($group->is_required && $selected->isEmpty()) {
+                return "{$group->name} majburiy tanlov.";
+            }
+
+            if ($group->max_selected && $selected->count() > $group->max_selected) {
+                return "{$group->name} uchun maksimum {$group->max_selected} ta option tanlanadi.";
+            }
+        }
+
+        return null;
     }
 
     protected function distributeSplitAmounts(float $total, int $splitCount): array
@@ -712,6 +1209,29 @@ class PosDashboard extends Component
         foreach (range(1, $splitCount) as $index) {
             $amountInCents = $baseAmount + ($index <= $remainder ? 1 : 0);
             $amounts[] = $amountInCents / 100;
+        }
+
+        return $amounts;
+    }
+
+    protected function distributeItemSplitAmounts(Collection $items, float $total): array
+    {
+        $totalCents = (int) round($total * 100);
+        $subtotalCents = max(1, (int) round($items->sum(fn ($item) => (float) $item->line_total) * 100));
+        $allocated = 0;
+        $amounts = [];
+        $lastIndex = $items->count() - 1;
+
+        foreach ($items as $index => $item) {
+            if ($index === $lastIndex) {
+                $amountInCents = $totalCents - $allocated;
+            } else {
+                $lineCents = (int) round((float) $item->line_total * 100);
+                $amountInCents = (int) floor($totalCents * ($lineCents / $subtotalCents));
+                $allocated += $amountInCents;
+            }
+
+            $amounts[] = max(0, $amountInCents) / 100;
         }
 
         return $amounts;
@@ -739,6 +1259,7 @@ class PosDashboard extends Component
         $this->paymentMethod = 'cash';
         $this->notes = '';
         $this->cart = [];
+        $this->cancelProductConfiguration();
         $this->resetErrorBag();
     }
 
@@ -764,7 +1285,7 @@ class PosDashboard extends Component
             ->get();
 
         $serviceOrders = $this->settlementOrdersQuery()
-            ->with(['diningTable', 'items', 'splits', 'payments', 'waiter', 'cashier'])
+            ->with(['diningTable', 'items.modifiers', 'splits', 'payments', 'waiter', 'cashier'])
             ->when($serviceOrderSearch !== '', function (Builder $query) use ($serviceOrderSearch) {
                 $query->where(function (Builder $innerQuery) use ($serviceOrderSearch) {
                     $innerQuery
@@ -804,6 +1325,7 @@ class PosDashboard extends Component
         }
 
         $selectedSplit = $selectedServiceOrder?->splits->firstWhere('id', $this->selectedSplitId);
+        $configuringProduct = $this->configuringProduct();
 
         return view('livewire.pos-dashboard', [
             'branches' => Branch::where('is_active', true)->orderBy('name')->get(),
@@ -814,6 +1336,7 @@ class PosDashboard extends Component
             'serviceOrders' => $serviceOrders,
             'selectedServiceOrder' => $selectedServiceOrder,
             'selectedSplit' => $selectedSplit,
+            'configuringProduct' => $configuringProduct,
             'cartItems' => $cartItems,
             'subtotal' => $cartItems->sum('line_total'),
             'recentOrders' => Order::query()

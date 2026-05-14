@@ -41,7 +41,7 @@
                     </div>
 
                     <div class="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-50">
-                        Parol avtomatik yaratiladi: <span class="font-semibold">login456</span>
+                        Vaqtinchalik parol avtomatik yaratiladi va xodim birinchi kirishda uni almashtiradi.
                     </div>
 
                     <button type="submit" class="btn btn-warning">Add staff</button>
@@ -129,7 +129,7 @@
                         </div>
 
                         <p class="mt-4 text-sm text-slate-400">
-                            Login o'zgarsa parol ham avtomatik <span class="text-amber-200">yangi-login456</span> formatiga yangilanadi.
+                            Login o'zgarsa yangi vaqtinchalik parol yaratiladi va majburiy password change yoqiladi.
                         </p>
                     </form>
 

@@ -1,6 +1,10 @@
 @extends('layouts.auth')
 
 @section('content')
+    @php
+        $showDemoAccounts = app()->environment(['local', 'testing']) || config('app.debug');
+    @endphp
+
     <div class="grid w-full gap-6 lg:grid-cols-[1.08fr_0.92fr]">
         <section class="soft-panel rounded-[2rem] border border-white/10 p-8 lg:p-10">
             <div class="flex flex-wrap items-center gap-3">
@@ -17,30 +21,32 @@
             </h1>
             <p class="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
                 Manager, cashier, waiter, chef va bartender uchun alohida kabinetlar tayyor.
-                Bu yerda demo foydalanuvchilar ham ko'rsatilgan, shuning uchun test qilish oson bo'ladi.
+                Demo accountlar faqat local/testing muhitida ko'rsatiladi.
             </p>
 
-            <div class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                @foreach ([
-                    ['role' => 'Admin', 'login' => 'admin', 'password' => 'admin456'],
-                    ['role' => 'Manager', 'login' => 'manager', 'password' => 'manager456'],
-                    ['role' => 'Cashier', 'login' => 'cashier', 'password' => 'cashier456'],
-                    ['role' => 'Waiter', 'login' => 'waiter', 'password' => 'waiter456'],
-                    ['role' => 'Chef', 'login' => 'chef', 'password' => 'chef456'],
-                    ['role' => 'Bartender', 'login' => 'bartender', 'password' => 'bartender456'],
-                ] as $account)
-                    <button
-                        type="button"
-                        class="demo-account rounded-[1.5rem] border border-white/10 bg-slate-950/55 p-4 text-left transition hover:border-amber-300/30 hover:bg-amber-400/10"
-                        data-login="{{ $account['login'] }}"
-                        data-password="{{ $account['password'] }}"
-                    >
-                        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">{{ $account['role'] }}</p>
-                        <p class="mt-3 text-base font-semibold text-white">{{ $account['login'] }}</p>
-                        <p class="mt-1 text-sm text-slate-400">{{ $account['password'] }}</p>
-                    </button>
-                @endforeach
-            </div>
+            @if ($showDemoAccounts)
+                <div class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    @foreach ([
+                        ['role' => 'Admin', 'login' => 'admin', 'password' => 'admin456'],
+                        ['role' => 'Manager', 'login' => 'manager', 'password' => 'manager456'],
+                        ['role' => 'Cashier', 'login' => 'cashier', 'password' => 'cashier456'],
+                        ['role' => 'Waiter', 'login' => 'waiter', 'password' => 'waiter456'],
+                        ['role' => 'Chef', 'login' => 'chef', 'password' => 'chef456'],
+                        ['role' => 'Bartender', 'login' => 'bartender', 'password' => 'bartender456'],
+                    ] as $account)
+                        <button
+                            type="button"
+                            class="demo-account rounded-[1.5rem] border border-white/10 bg-slate-950/55 p-4 text-left transition hover:border-amber-300/30 hover:bg-amber-400/10"
+                            data-login="{{ $account['login'] }}"
+                            data-password="{{ $account['password'] }}"
+                        >
+                            <p class="text-xs uppercase tracking-[0.3em] text-slate-500">{{ $account['role'] }}</p>
+                            <p class="mt-3 text-base font-semibold text-white">{{ $account['login'] }}</p>
+                            <p class="mt-1 text-sm text-slate-400">Local demo only</p>
+                        </button>
+                    @endforeach
+                </div>
+            @endif
         </section>
 
         <section class="soft-panel rounded-[2rem] border border-white/10 p-8">
@@ -118,16 +124,17 @@
                 togglePassword.textContent = isPassword ? 'Hide' : 'Show';
             });
 
-            document.querySelectorAll('.demo-account').forEach((button) => {
-                button.addEventListener('click', () => {
-                    loginInput.value = button.dataset.login ?? '';
-                    passwordInput.value = button.dataset.password ?? '';
-                    form.submit();
+            if ({{ $showDemoAccounts ? 'true' : 'false' }}) {
+                document.querySelectorAll('.demo-account').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        loginInput.value = button.dataset.login ?? '';
+                        passwordInput.value = button.dataset.password ?? '';
+                        form.submit();
+                    });
                 });
-            });
+            }
         }); 
     </script>
 @endsection
-
 
 

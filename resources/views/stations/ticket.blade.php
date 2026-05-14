@@ -152,6 +152,12 @@
                         <div>
                             <p><strong>{{ $item->product_name }}</strong></p>
                             <p class="muted">{{ $item->preparationStatusLabel() }}</p>
+                            @if ($item->modifiers->isNotEmpty())
+                                <p class="muted">{{ $item->modifierSummary() }}</p>
+                            @endif
+                            @if ($item->item_note)
+                                <p class="muted">Note: {{ $item->item_note }}</p>
+                            @endif
                         </div>
                         <div style="text-align:right;">
                             <p><strong>{{ $item->quantity }} pcs</strong></p>

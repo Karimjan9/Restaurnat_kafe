@@ -81,6 +81,28 @@ class SplitBillTest extends TestCase
             ->assertHasErrors('selectedServiceOrderId');
     }
 
+    public function test_cashier_can_create_item_level_splits(): void
+    {
+        $this->seed(RestaurantPosSeeder::class);
+
+        $order = $this->createServedWaiterOrder();
+        $cashier = User::where('login', 'cashier')->firstOrFail();
+
+        $this->actingAs($cashier);
+
+        Livewire::test(PosDashboard::class)
+            ->call('selectServiceOrder', $order->id)
+            ->call('createItemSplits')
+            ->assertHasNoErrors();
+
+        $order->refresh()->load('splits.splitItems');
+
+        $this->assertCount($order->items()->count(), $order->splits);
+        $this->assertSame('item', $order->splits->first()->split_type);
+        $this->assertEquals((float) $order->total, (float) $order->splits->sum('amount'));
+        $this->assertTrue($order->splits->every(fn ($split) => $split->splitItems->isNotEmpty()));
+    }
+
     protected function createServedWaiterOrder(): Order
     {
         $cashier = User::where('login', 'cashier')->firstOrFail();

@@ -29,6 +29,7 @@ class ReceiptController extends Controller
             'order' => $order,
             'itemsCount' => $order->items->sum('quantity'),
             'paidAmount' => (float) $order->payments->sum('amount'),
+            'refundedAmount' => (float) $order->refunds->sum('amount'),
         ]);
     }
 
@@ -47,9 +48,10 @@ class ReceiptController extends Controller
             'cashier.role',
             'waiter.role',
             'closedBy.role',
-            'items',
+            'items.modifiers',
             'splits.paidBy',
             'payments.orderSplit',
+            'refunds.cashier',
         ]);
     }
 }

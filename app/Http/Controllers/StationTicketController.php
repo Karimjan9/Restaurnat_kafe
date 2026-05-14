@@ -24,7 +24,7 @@ class StationTicketController extends Controller
             abort(403);
         }
 
-        $order->load(['branch', 'diningTable', 'waiter', 'cashier', 'items']);
+        $order->load(['branch', 'diningTable', 'waiter', 'cashier', 'items.modifiers']);
 
         $items = $order->items
             ->where('station', $station)

@@ -33,6 +33,11 @@
                     </div>
                 </form>
             </div>
+
+            <div class="mt-5 flex flex-wrap gap-3">
+                <a href="{{ route('reports.export', [...$filters, 'format' => 'csv']) }}" class="btn btn-outline btn-warning btn-sm">Export Excel CSV</a>
+                <a href="{{ route('reports.export', [...$filters, 'format' => 'pdf']) }}" target="_blank" rel="noopener" class="btn btn-outline btn-warning btn-sm">PDF print view</a>
+            </div>
         </section>
 
         <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -55,6 +60,26 @@
             </div>
         </section>
 
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Discounts</p>
+                <p class="mt-3 text-3xl font-semibold text-amber-200">{{ number_format((float) $discountTotal) }} so'm</p>
+            </div>
+            <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Refunds</p>
+                <p class="mt-3 text-3xl font-semibold text-rose-300">{{ number_format((float) $refundTotal) }} so'm</p>
+            </div>
+            <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Net sales</p>
+                <p class="mt-3 text-3xl font-semibold text-emerald-300">{{ number_format((float) $netSales) }} so'm</p>
+            </div>
+            <div class="soft-panel rounded-[1.75rem] border border-white/10 p-5">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Gross profit</p>
+                <p class="mt-3 text-3xl font-semibold text-sky-300">{{ number_format((float) $grossProfit) }} so'm</p>
+                <p class="mt-2 text-sm text-slate-400">COGS: {{ number_format((float) $cogs) }} so'm</p>
+            </div>
+        </section>
+
         <section class="grid gap-6 xl:grid-cols-3">
             <div class="soft-panel rounded-[2rem] border border-white/10 p-6">
                 <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Payments</p>
@@ -64,7 +89,10 @@
                     @foreach (config('pos.payment_methods') as $method => $label)
                         <div class="flex items-center justify-between rounded-[1.5rem] border border-white/10 bg-slate-950/50 p-4">
                             <span class="text-slate-300">{{ $label }}</span>
-                            <span class="font-semibold text-white">{{ number_format((float) ($paymentBreakdown[$method] ?? 0)) }} so'm</span>
+                            <span class="text-right">
+                                <span class="block font-semibold text-white">{{ number_format((float) ($paymentBreakdown[$method] ?? 0)) }} so'm</span>
+                                <span class="block text-xs text-rose-300">Refund: {{ number_format((float) ($refundBreakdown[$method] ?? 0)) }}</span>
+                            </span>
                         </div>
                     @endforeach
                 </div>
@@ -96,9 +124,72 @@
                                 <span class="text-slate-300">{{ $product->quantity }} pcs</span>
                             </div>
                             <p class="mt-2 text-sm text-amber-200">{{ number_format((float) $product->total) }} so'm</p>
+                            <p class="mt-1 text-xs text-emerald-300">Margin: {{ number_format((float) $product->margin) }} so'm</p>
                         </div>
                     @empty
                         <div class="text-slate-400">No product sales in this range.</div>
+                    @endforelse
+                </div>
+            </div>
+        </section>
+
+        <section class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <div class="soft-panel rounded-[2rem] border border-white/10 p-6">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Product margin</p>
+                <h3 class="mt-2 text-xl font-semibold text-white">Revenue, COGS and profit</h3>
+
+                <div class="mt-5 overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr class="text-slate-400">
+                                <th>Product</th>
+                                <th>Qty</th>
+                                <th>Revenue</th>
+                                <th>COGS</th>
+                                <th>Gross profit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($productMargins as $product)
+                                <tr>
+                                    <td>{{ $product->product_name }}</td>
+                                    <td>{{ $product->quantity }}</td>
+                                    <td>{{ number_format((float) $product->revenue) }} so'm</td>
+                                    <td>{{ number_format((float) $product->cogs) }} so'm</td>
+                                    <td>{{ number_format((float) $product->gross_profit) }} so'm</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-slate-400">Bu oraliqda margin ma'lumoti yo'q.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="soft-panel rounded-[2rem] border border-white/10 p-6">
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Daily closing</p>
+                <h3 class="mt-2 text-xl font-semibold text-white">Shift reconciliation</h3>
+
+                <div class="mt-5 space-y-3">
+                    @forelse ($dailyClosings as $shift)
+                        <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/50 p-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="font-medium text-white">{{ $shift->branch?->name }} | {{ $shift->cashier?->name }}</p>
+                                    <p class="mt-1 text-sm text-slate-400">{{ optional($shift->opened_at)->format('d.m.Y H:i') }} - {{ optional($shift->closed_at)->format('d.m.Y H:i') ?? 'open' }}</p>
+                                </div>
+                                <span class="badge {{ $shift->status === 'open' ? 'badge-success' : 'badge-ghost' }}">{{ $shift->status }}</span>
+                            </div>
+                            <p class="mt-3 text-sm text-slate-300">
+                                Expected {{ number_format((float) $shift->expected_cash) }} | Counted {{ number_format((float) $shift->counted_cash) }} | Diff {{ number_format((float) $shift->cash_difference) }}
+                            </p>
+                        </div>
+                    @empty
+                        <div class="rounded-[1.5rem] border border-dashed border-white/10 bg-slate-950/40 p-6 text-center text-slate-400">
+                            Bu oraliqda shift closing yo'q.
+                        </div>
                     @endforelse
                 </div>
             </div>

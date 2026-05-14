@@ -141,16 +141,27 @@
                             </div>
                         </div>
 
-                        <button type="button" wire:click="removeProduct({{ $item['id'] }})" class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-100">
+                        <button type="button" wire:click="removeCartLine('{{ $item['key'] }}')" class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-100">
                             Remove
                         </button>
                     </div>
 
+                    @if ($item['modifier_summary'] || $item['note'])
+                        <div class="mt-3 rounded-[1.1rem] border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                            @if ($item['modifier_summary'])
+                                <p><span class="font-medium text-slate-800">Modifiers:</span> {{ $item['modifier_summary'] }}</p>
+                            @endif
+                            @if ($item['note'])
+                                <p class="mt-1"><span class="font-medium text-slate-800">Note:</span> {{ $item['note'] }}</p>
+                            @endif
+                        </div>
+                    @endif
+
                     <div class="mt-4 grid grid-cols-[auto_1fr_auto] items-center gap-3">
                         <div class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 p-1">
-                            <button type="button" wire:click="decrementQuantity({{ $item['id'] }})" class="h-8 w-8 rounded-full text-lg font-semibold text-slate-600 transition hover:bg-white">-</button>
+                            <button type="button" wire:click="decrementLineQuantity('{{ $item['key'] }}')" class="h-8 w-8 rounded-full text-lg font-semibold text-slate-600 transition hover:bg-white">-</button>
                             <span class="inline-flex min-w-[2.2rem] items-center justify-center text-sm font-semibold text-slate-900">{{ $item['quantity'] }}</span>
-                            <button type="button" wire:click="incrementQuantity({{ $item['id'] }})" class="h-8 w-8 rounded-full text-lg font-semibold text-slate-600 transition hover:bg-white">+</button>
+                            <button type="button" wire:click="incrementLineQuantity('{{ $item['key'] }}')" class="h-8 w-8 rounded-full text-lg font-semibold text-slate-600 transition hover:bg-white">+</button>
                         </div>
 
                         <div class="text-sm text-slate-500">{{ number_format((float) $item['price']) }} so'm each</div>

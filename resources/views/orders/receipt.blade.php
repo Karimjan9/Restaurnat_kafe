@@ -36,6 +36,12 @@
                             <div>
                                 <p class="font-medium text-white">{{ $item->product_name }}</p>
                                 <p class="text-sm text-slate-400">{{ $item->quantity }} x {{ number_format((float) $item->unit_price) }} so'm</p>
+                                @if ($item->modifiers->isNotEmpty())
+                                    <p class="mt-1 text-sm text-violet-200">{{ $item->modifierSummary() }}</p>
+                                @endif
+                                @if ($item->item_note)
+                                    <p class="mt-1 text-sm text-amber-200">Note: {{ $item->item_note }}</p>
+                                @endif
                             </div>
                             <p class="font-semibold text-amber-200">{{ number_format((float) $item->line_total) }} so'm</p>
                         </div>
@@ -96,10 +102,26 @@
                     </div>
 
                     <div class="mt-5 rounded-[1.5rem] border border-emerald-400/20 bg-emerald-400/10 p-4">
+                        @if ((float) $order->discount_total > 0)
+                            <div class="mb-3 flex items-center justify-between text-sm">
+                                <span class="text-slate-300">Discount</span>
+                                <span class="font-semibold text-amber-200">-{{ number_format((float) $order->discount_total) }} so'm</span>
+                            </div>
+                        @endif
                         <div class="flex items-center justify-between">
                             <span class="text-slate-300">Total</span>
                             <span class="text-2xl font-semibold text-white">{{ number_format((float) $order->total) }} so'm</span>
                         </div>
+                        @if ($order->refunds->isNotEmpty())
+                            <div class="mt-3 rounded-2xl border border-rose-400/20 bg-rose-400/10 p-3">
+                                <p class="text-xs uppercase tracking-[0.25em] text-rose-200">Refunds</p>
+                                @foreach ($order->refunds as $refund)
+                                    <p class="mt-2 text-sm text-rose-100">
+                                        {{ number_format((float) $refund->amount) }} so'm | {{ config('pos.payment_methods')[$refund->method] ?? $refund->method }} | {{ $refund->reason }}
+                                    </p>
+                                @endforeach
+                            </div>
+                        @endif
                         @if ($order->waiter)
                             <p class="mt-2 text-sm text-slate-300">
                                 Waiter: {{ $order->waiter->name }}

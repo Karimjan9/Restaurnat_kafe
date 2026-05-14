@@ -18,6 +18,9 @@ return [
         'tables.manage' => 'Manage dining tables',
         'categories.manage' => 'Manage categories',
         'products.manage' => 'Manage products',
+        'operations.manage' => 'Manage table operations and order exceptions',
+        'shifts.manage' => 'Manage cashier shifts and reconciliation',
+        'refunds.manage' => 'Manage refunds and voids',
         'orders.create' => 'Create orders',
         'orders.view' => 'View orders and receipts',
         'waiter.panel' => 'Take table orders from waiter panel',
@@ -29,6 +32,15 @@ return [
     'product_stations' => [
         'kitchen' => 'Kitchen',
         'bar' => 'Bar',
+    ],
+
+    'table_statuses' => [
+        'available' => 'Available',
+        'occupied' => 'Occupied',
+        'payment_due' => 'Payment Due',
+        'reserved' => 'Reserved',
+        'cleaning' => 'Cleaning',
+        'blocked' => 'Blocked',
     ],
 
     'preparation_statuses' => [
@@ -45,6 +57,8 @@ return [
         'served' => 'Served',
         'paid' => 'Paid',
         'closed' => 'Closed',
+        'voided' => 'Voided',
+        'merged' => 'Merged',
     ],
 
     'order_split_statuses' => [

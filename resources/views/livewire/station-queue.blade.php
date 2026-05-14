@@ -92,6 +92,12 @@
                                     <p class="mt-2 text-sm text-slate-400">
                                         Yuborildi: {{ optional($item->sent_to_station_at)->format('H:i') ?: optional($item->created_at)->format('H:i') }}
                                     </p>
+                                    @if ($item->modifiers->isNotEmpty())
+                                        <p class="mt-2 text-sm text-amber-200">{{ $item->modifierSummary() }}</p>
+                                    @endif
+                                    @if ($item->item_note)
+                                        <p class="mt-1 text-sm text-emerald-200">Note: {{ $item->item_note }}</p>
+                                    @endif
                                 </div>
 
                                 <div class="flex gap-2">

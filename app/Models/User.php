@@ -6,6 +6,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
@@ -26,6 +27,8 @@ class User extends Authenticatable
         'branch_id',
         'role_id',
         'password',
+        'force_password_change',
+        'password_changed_at',
     ];
 
     /**
@@ -47,6 +50,8 @@ class User extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'force_password_change' => 'boolean',
+            'password_changed_at' => 'datetime',
         ];
     }
 
@@ -58,6 +63,16 @@ class User extends Authenticatable
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function shifts(): HasMany
+    {
+        return $this->hasMany(Shift::class);
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class, 'actor_user_id');
     }
 
     public function hasRole(string $role): bool

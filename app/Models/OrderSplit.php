@@ -15,6 +15,7 @@ class OrderSplit extends Model
         'order_id',
         'split_number',
         'label',
+        'split_type',
         'amount',
         'status',
         'paid_by_user_id',
@@ -42,6 +43,11 @@ class OrderSplit extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class, 'order_split_id');
+    }
+
+    public function splitItems(): HasMany
+    {
+        return $this->hasMany(OrderSplitItem::class);
     }
 
     public function statusLabel(): string

@@ -45,15 +45,37 @@
                         <textarea name="description" rows="3" class="textarea textarea-bordered bg-slate-950/70 text-white"></textarea>
                     </label>
 
-                    <label class="form-control">
-                        <span class="label-text mb-2 text-slate-300">Price (so'm)</span>
-                        <input type="number" name="price" min="0" step="0.01" class="input input-bordered bg-slate-950/70 text-white" required>
-                    </label>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <label class="form-control">
+                            <span class="label-text mb-2 text-slate-300">Price (so'm)</span>
+                            <input type="number" name="price" min="0" step="0.01" class="input input-bordered bg-slate-950/70 text-white" required>
+                        </label>
+
+                        <label class="form-control">
+                            <span class="label-text mb-2 text-slate-300">Food cost (so'm)</span>
+                            <input type="number" name="cost_price" min="0" step="0.01" value="0" class="input input-bordered bg-slate-950/70 text-white">
+                        </label>
+                    </div>
 
                     <label class="label cursor-pointer justify-start gap-3">
                         <input type="checkbox" name="is_active" value="1" class="checkbox checkbox-warning" checked>
                         <span class="label-text text-slate-300">Active product</span>
                     </label>
+
+                    <div class="rounded-[1.5rem] border border-white/10 bg-slate-950/50 p-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="text-sm font-medium text-white">Modifier groups</span>
+                            <a href="{{ route('modifiers.index') }}" class="text-xs font-medium text-amber-200 hover:text-white">Manage</a>
+                        </div>
+                        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                            @foreach ($modifierGroups as $group)
+                                <label class="label cursor-pointer justify-start gap-3">
+                                    <input type="checkbox" name="modifier_group_ids[]" value="{{ $group->id }}" class="checkbox checkbox-sm checkbox-warning">
+                                    <span class="label-text text-slate-300">{{ $group->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
 
                     <button type="submit" class="btn btn-warning">Save product</button>
                 </form>
@@ -75,7 +97,9 @@
                                 <div class="text-right">
                                     <span class="badge {{ $product->station === 'bar' ? 'badge-info' : 'badge-warning' }}">{{ $product->stationLabel() }}</span>
                                     <p class="font-semibold text-amber-200">{{ number_format((float) $product->price) }} so'm</p>
+                                    <p class="text-xs text-emerald-300">Cost: {{ number_format((float) $product->cost_price) }}</p>
                                     <p class="text-xs text-slate-500">{{ $product->sku ?: 'No SKU' }}</p>
+                                    <p class="mt-2 text-xs text-slate-400">{{ $product->modifierGroups->pluck('name')->implode(', ') ?: 'No modifiers' }}</p>
                                 </div>
                             </div>
                         </div>
@@ -94,7 +118,7 @@
                         @csrf
                         @method('PUT')
 
-                        <div class="grid gap-4 xl:grid-cols-[0.8fr_1fr_0.8fr_0.8fr_0.8fr_auto]">
+                        <div class="grid gap-4 xl:grid-cols-[0.75fr_1fr_0.7fr_0.7fr_0.7fr_0.7fr_auto]">
                             <label class="form-control">
                                 <span class="label-text mb-2 text-slate-300">Category</span>
                                 <select name="category_id" class="select select-bordered bg-slate-950/70 text-white" required>
@@ -128,6 +152,11 @@
                                 <input type="number" name="price" min="0" step="0.01" value="{{ $product->price }}" class="input input-bordered bg-slate-950/70 text-white" required>
                             </label>
 
+                            <label class="form-control">
+                                <span class="label-text mb-2 text-slate-300">Cost</span>
+                                <input type="number" name="cost_price" min="0" step="0.01" value="{{ $product->cost_price }}" class="input input-bordered bg-slate-950/70 text-white">
+                            </label>
+
                             <div class="flex items-end gap-2">
                                 <label class="label cursor-pointer gap-2">
                                     <input type="checkbox" name="is_active" value="1" class="checkbox checkbox-warning" @checked($product->is_active)>
@@ -142,6 +171,21 @@
                             <span class="label-text mb-2 text-slate-300">Description</span>
                             <textarea name="description" rows="2" class="textarea textarea-bordered bg-slate-950/70 text-white">{{ $product->description }}</textarea>
                         </label>
+
+                        <div class="mt-4 rounded-[1.5rem] border border-white/10 bg-slate-950/50 p-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-sm font-medium text-white">Modifier groups</span>
+                                <a href="{{ route('modifiers.index') }}" class="text-xs font-medium text-amber-200 hover:text-white">Manage</a>
+                            </div>
+                            <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                @foreach ($modifierGroups as $group)
+                                    <label class="label cursor-pointer justify-start gap-3">
+                                        <input type="checkbox" name="modifier_group_ids[]" value="{{ $group->id }}" class="checkbox checkbox-sm checkbox-warning" @checked($product->modifierGroups->contains('id', $group->id))>
+                                        <span class="label-text text-slate-300">{{ $group->name }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
                     </form>
 
                     <form id="delete-product-{{ $product->id }}" action="{{ route('products.destroy', $product) }}" method="POST" class="hidden">

@@ -14,6 +14,7 @@ class Payment extends Model
         'order_id',
         'order_split_id',
         'user_id',
+        'shift_id',
         'method',
         'amount',
         'reference',
@@ -41,5 +42,10 @@ class Payment extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
     }
 }

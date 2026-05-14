@@ -88,7 +88,7 @@ class WaiterPanel extends Component
     public function render()
     {
         $orders = $this->dailyOrdersQuery()
-            ->with(['items', 'diningTable', 'cashier', 'payments'])
+            ->with(['items.modifiers', 'diningTable', 'cashier', 'payments'])
             ->orderByRaw("CASE status WHEN 'ready' THEN 0 WHEN 'in_service' THEN 1 WHEN 'open' THEN 2 WHEN 'served' THEN 3 WHEN 'paid' THEN 4 WHEN 'closed' THEN 5 ELSE 6 END")
             ->latest('placed_at')
             ->get();

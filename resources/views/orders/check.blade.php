@@ -203,6 +203,12 @@
                         <span>{{ $item->quantity }} x {{ number_format((float) $item->unit_price) }}</span>
                         <span>{{ config("pos.product_stations.{$item->station}", $item->station) }}</span>
                     </div>
+                    @if ($item->modifiers->isNotEmpty())
+                        <p class="muted">{{ $item->modifierSummary() }}</p>
+                    @endif
+                    @if ($item->item_note)
+                        <p class="muted">Note: {{ $item->item_note }}</p>
+                    @endif
                 </div>
             @endforeach
         </div>
@@ -218,6 +224,12 @@
                 <span>Subtotal</span>
                 <span>{{ number_format((float) $order->subtotal) }} so'm</span>
             </div>
+            @if ((float) $order->discount_total > 0)
+                <div class="row">
+                    <span>Discount</span>
+                    <span>-{{ number_format((float) $order->discount_total) }} so'm</span>
+                </div>
+            @endif
             <div class="row total">
                 <span>Total</span>
                 <span>{{ number_format((float) $order->total) }} so'm</span>
@@ -246,6 +258,12 @@
             <span>Paid amount</span>
             <strong>{{ number_format($paidAmount) }} so'm</strong>
         </div>
+        @if ($refundedAmount > 0)
+            <div class="row">
+                <span>Refunded</span>
+                <strong>-{{ number_format($refundedAmount) }} so'm</strong>
+            </div>
+        @endif
 
         @if ($order->notes)
             <div class="divider"></div>

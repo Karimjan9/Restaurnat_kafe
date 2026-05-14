@@ -110,6 +110,12 @@ class CabinetController extends Controller
                 'permission' => 'orders.create',
             ],
             [
+                'label' => 'Operations',
+                'description' => 'Table map, shift, discount, void/refund va merge.',
+                'route' => 'operations.index',
+                'permission' => 'operations.manage',
+            ],
+            [
                 'label' => 'Waiter Panel',
                 'description' => 'Biriktirilgan orderlar, topshirish va kunlik komissiya.',
                 'route' => 'waiter.index',

@@ -39,4 +39,9 @@ class Branch extends Model
     {
         return $this->hasMany(Order::class);
     }
+
+    public function shifts(): HasMany
+    {
+        return $this->hasMany(Shift::class);
+    }
 }

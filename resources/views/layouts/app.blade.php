@@ -51,6 +51,13 @@
                     </a>
                 @endcan
 
+                @can('operations.manage')
+                    <a href="{{ route('operations.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('operations.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
+                        <span>Operations</span>
+                        <span class="badge badge-outline">03A</span>
+                    </a>
+                @endcan
+
                 @can('kitchen.view')
                     <a href="{{ route('kitchen.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('kitchen.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Kitchen Queue</span>
@@ -104,6 +111,10 @@
                     <a href="{{ route('products.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('products.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
                         <span>Products</span>
                         <span class="badge badge-outline">11</span>
+                    </a>
+                    <a href="{{ route('modifiers.index') }}" class="flex items-center justify-between rounded-2xl border px-4 py-3 transition {{ request()->routeIs('modifiers.*') ? 'border-amber-300/40 bg-amber-400/10 text-white' : 'border-white/10 bg-slate-950/40 text-slate-300 hover:border-white/20 hover:text-white' }}">
+                        <span>Modifiers</span>
+                        <span class="badge badge-outline">11A</span>
                     </a>
                 @endcan
 
